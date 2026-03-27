@@ -1,0 +1,25 @@
+# bluerov_ws.repos
+# Usage: vcs import src < bluerov_ws.repos
+
+repositories:
+
+  # ── Core: ArduPilot Gazebo Plugin ──────────────────────────────────────────
+  # Provides libArduPilotPlugin.so — the JSON-UDP bridge between
+  # Gazebo physics and ArduSub SITL.
+  ardupilot_gazebo:
+    type: git
+    url: https://github.com/ArduPilot/ardupilot_gazebo.git
+    version: 50e62a55242e2a35f3fed13920faca02818a47e3
+    depth: 1
+
+  dave:
+    type: git
+    url: https://github.com/IOES-Lab/dave.git
+    version: 2e236fa32e0bbf8daa40e51cd2edce7c629f66f5
+    depth: 1
+
+  bb_worlds:
+    type: git
+    url: https://github.com/BumblebeeAS/bb_worlds.git
+    version: main
+    depth: 1
