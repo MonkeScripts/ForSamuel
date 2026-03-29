@@ -22,6 +22,13 @@ from launch_ros.substitutions import FindPackageShare
 def launch_setup(context, *args, **kwargs):
 
     pkg_bluerov_sim = get_package_share_directory("bluerov_sim")
+
+    # Load URDF for robot_state_publisher and Foxglove visualization.
+    # The Gazebo SDF model (for physics/collisions/sensors) is loaded separately via model_sdf_path.
+    urdf_path_str = LaunchConfiguration("urdf_path").perform(context)
+    with open(urdf_path_str, "r") as f:
+        robot_description = f.read()
+
     ardusub_params_file = os.path.join(pkg_bluerov_sim, "config", "ardusub.parm")
     mavros_params_file = os.path.join(
         pkg_bluerov_sim, "mavros_params", "sim_mavros_params.yaml"
@@ -71,21 +78,26 @@ def launch_setup(context, *args, **kwargs):
     home_lon = -118.393867
     home_alt = 0.0
     home_heading = 0.0
+    world_full_path = ""
+    gz_world_name = ""
     if world_filename:
         resource_path = os.environ.get("GZ_SIM_RESOURCE_PATH", "")
         search_dirs = resource_path.split(":") if resource_path else []
-        world_full_path = None
         for d in search_dirs:
             candidate = os.path.join(d, world_filename)
             if os.path.exists(candidate):
                 world_full_path = candidate
                 break
+
         if world_full_path:
             print(f"Parsing world file for coordinates: {world_full_path}")
             try:
                 tree = ET.parse(world_full_path)
                 root = tree.getroot()
                 world_elem = root.find("world")
+                gz_world_name = (
+                    world_elem.get("name", "") if world_elem is not None else ""
+                )
                 if world_elem is not None:
                     sc = world_elem.find("spherical_coordinates")
                     if sc is not None:
@@ -110,7 +122,9 @@ def launch_setup(context, *args, **kwargs):
             except Exception as e:
                 print(f"XML Parsing failed: {e}. Using defaults.")
         else:
-            print("World file not found in GZ_SIM_RESOURCE_PATH. Using default coordinates.")
+            print(
+                "World file not found in GZ_SIM_RESOURCE_PATH. Using default coordinates."
+            )
 
     # Create the string for ArduSub: "Lat,Lon,Alt,Yaw"
     home_str = f"{home_lat},{home_lon},{home_alt},{home_heading}"
@@ -153,14 +167,7 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(gui),
     )
 
-    description_file = PathJoinSubstitution(
-        [
-            FindPackageShare("bluerov_sim"),
-            "models",
-            "bluerov2",
-            "model.sdf",
-        ]
-    )
+    description_file = LaunchConfiguration("model_sdf_path")
 
     gz_spawner = Node(
         package="ros_gz_sim",
@@ -217,22 +224,65 @@ def launch_setup(context, *args, **kwargs):
         package="bluerov_sim",
         executable="ground_truth_to_mavros.py",
         output="screen",
+        parameters=[{"use_sim_time": use_sim_time}],
     )
 
-    # ArduSub must be listening on UDP 9002 before the model is spawned,
-    # otherwise lock_step=1 causes Gazebo to freeze waiting for a response.
-    # Start ArduSub and Gazebo first, delay spawning the model.
-    delayed_spawn = TimerAction(
-        period=5.0,
-        actions=[gz_spawner, spawn_exit_handler, gz_bridge, ground_truth_to_mavros],
+    robot_state_publisher_node = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        parameters=[
+            {
+                "robot_description": robot_description,
+                "use_sim_time": use_sim_time,
+            }
+        ],
     )
 
-    return [
+    foxglove_bridge_node = Node(
+        package="foxglove_bridge",
+        executable="foxglove_bridge",
+        name="foxglove_bridge",
+        parameters=[
+            {
+                "port": 8765,
+                "use_sim_time": use_sim_time,
+            }
+        ],
+    )
+
+    world_objects_node = Node(
+        package="bluerov_sim",
+        executable="world_objects_to_markers.py",
+        parameters=[
+            {
+                "world_file": world_full_path,
+                "gz_world_name": gz_world_name,
+            }
+        ],
+    )
+
+    # # ArduSub must be listening on UDP 9002 before the model is spawned,
+    # # otherwise lock_step=1 causes Gazebo to freeze waiting for a response.
+    # # Start ArduSub and Gazebo first, delay spawning the model.
+    # delayed_spawn = TimerAction(
+    #     period=5.0,
+    #     actions=[],
+    # )
+
+    result = [
         ardusub_launch,
         gz_sim_launch,
+        gz_spawner,
+        spawn_exit_handler,
+        gz_bridge,
+        ground_truth_to_mavros,
         mavros_node,
-        delayed_spawn,
+        # delayed_spawn,
+        robot_state_publisher_node,
+        foxglove_bridge_node,
+        world_objects_node,
     ]
+    return result
 
 
 def generate_launch_description():
@@ -312,6 +362,20 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "mavros", default_value="true", description="Launch mavros?"
+        ),
+        DeclareLaunchArgument(
+            "urdf_path",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("bluerov_sim"), "urdf", "bluerov2.urdf"]
+            ),
+            description="Path to URDF for robot_state_publisher and Foxglove visualization",
+        ),
+        DeclareLaunchArgument(
+            "model_sdf_path",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("bluerov_sim"), "models", "bluerov2", "model.sdf"]
+            ),
+            description="Path to SDF model for Gazebo spawning (physics, collisions, sensors)",
         ),
     ]
 

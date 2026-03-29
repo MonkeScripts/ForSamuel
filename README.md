@@ -90,27 +90,32 @@ bluerov_ws/
 │   │   ├── dave_gz_world_plugins/
 │   │   └── dave_ros_gz_plugins/
 │   ├── bb_worlds/               # Competition worlds (RoboSub 2023/2025, SAUVC 2024)
+│   ├── foxglove-sdk/            # Foxglove bridge (built from source; see §3)
 │   └── bluerov_sim/             # Main orchestrator package
 │       ├── config/
 │       │   ├── ardusub.parm                # EKF3 external nav parameters
 │       │   ├── bluerov_gz_bridge.yaml      # Gazebo bridge: odom only
 │       │   └── bluerov_gz_bridge_full.yaml # Gazebo bridge: odom + DVL
 │       ├── launch/
-│       │   ├── bluerov_sim.launch.py       # Gazebo + ArduSub SITL + MAVROS
+│       │   ├── bluerov_sim.launch.py       # Gazebo + ArduSub SITL + MAVROS + Foxglove
 │       │   └── bluerov_mission.launch.py   # Odometry node + waypoint mission
 │       ├── mavros_params/
 │       │   └── sim_mavros_params.yaml
 │       ├── models/bluerov2/               # BlueROV2 SDF model with DVL + IMU
+│       ├── urdf/
+│       │   └── bluerov2.urdf              # Robot description for TF / Foxglove visualisation
 │       ├── worlds/                        # World files owned by this package
 │       │   └── robosub_2025_pool.world
 │       └── scripts/
 │           ├── ground_truth_to_mavros.py  # Gazebo odometry → MAVROS
 │           ├── dvl_to_mavros.py           # DVL + GT pose → MAVROS
-│           └── bluerov_movement.py        # Square waypoint mission
+│           ├── bluerov_movement.py        # Square waypoint mission
+│           └── world_objects_to_markers.py # World SDF → RViz/Foxglove MarkerArray
 ├── docker/
 │   └── Dockerfile               # ROS 2 Humble + Gazebo Harmonic + ArduSub SITL
 ├── build.bash                   # Docker image build wrapper
 ├── run.bash                     # Rocker launcher (--nvidia --x11 --network=host)
+├── bluerov_mission.yaml         # tmuxp session: sim + mission + Foxglove in one command
 └── bluerov_ws.repos             # vcs-tool manifest
 ```
 
@@ -130,10 +135,33 @@ The Docker image (`ros:humble-ros-base-jammy`) includes ROS 2 Humble, Gazebo Har
 
 ### Install rocker
 
-[rocker](https://github.com/osrf/rocker) is required to run the container. It wraps `docker run` with GPU and X11 support:
+[rocker](https://github.com/osrf/rocker) is required to run the container. It wraps `docker run` with GPU and X11 support.
+
+Setting things up in a virtual environment is recommended for isolation. If you don't already have it, install Python 3's venv module:
 
 ```bash
-pip install rocker
+sudo apt-get install python3-venv
+```
+
+Create a venv:
+
+```bash
+mkdir -p ~/rocker_venv
+python3 -m venv ~/rocker_venv
+```
+
+Install rocker:
+
+```bash
+cd ~/rocker_venv
+. ~/rocker_venv/bin/activate
+pip install git+https://github.com/osrf/rocker.git
+```
+
+For any new terminal, re-activate the venv before trying to use it:
+
+```bash
+. ~/rocker_venv/bin/activate
 ```
 
 ### Build the image
@@ -168,6 +196,18 @@ The workspace is accessible at `/root/HOST/bluerov_ws` inside the container.
 | `-s`   | noVNC / TurboVNC image for CloudSim                 |
 | `-t`   | CI/headless mode (no X11)                           |
 | `-x`   | VRX competition server base image                   |
+
+### Foxglove Bridge
+
+> **Note:** As of the [2026-03-20 ROS Humble Hawksbill release](https://discourse.openrobotics.org/t/new-packages-for-humble-hawksbill-2026-03-20/53413), `ros-humble-foxglove-bridge` has been **removed** from the official package index. It must be built from source.
+
+Clone the SDK into `src/` so it is picked up by `colcon build`:
+
+```bash
+git clone https://github.com/foxglove/foxglove-sdk src/foxglove-sdk
+```
+
+Then build it as part of the normal workspace build — no separate `make` step is needed. The bridge is launched automatically by `bluerov_sim.launch.py` and listens on port **8765**.
 
 ---
 
@@ -205,7 +245,10 @@ colcon build \
 colcon build \
   --packages-select dave_gz_model_plugins dave_ros_gz_plugins
 
-# Tier 5: All remaining packages
+# Tier 5: Foxglove bridge
+colcon build --packages-select foxglove_bridge
+
+# Tier 6: All remaining packages
 colcon build \
   --packages-select dave bluerov_sim bb_worlds
 
@@ -224,6 +267,22 @@ source install/setup.bash
 ---
 
 ## 5. Running Simulations
+
+### Quick-start with tmuxp
+
+`bluerov_mission.yaml` launches the full stack (simulation + mission + Foxglove) in a single tmux session with three panes:
+
+```bash
+tmuxp load bluerov_mission.yaml
+```
+
+| Pane | Contents |
+| ---- | -------- |
+| sim | `bluerov_sim.launch.py` with `world_name:=robosub_2025_pool`, ArduSub + MAVROS + GUI |
+| movement | `bluerov_mission.launch.py use_dvl:=false` |
+| monitor | Foxglove connection info — open `ws://localhost:8765` in Foxglove Studio |
+
+---
 
 ### Ground truth odometry (simplest)
 
@@ -297,9 +356,89 @@ ros2 launch bluerov_sim bluerov_mission.launch.py use_dvl:=false
 
 > The launch file parses `spherical_coordinates` from the world SDF to set ArduSub's home location automatically. If the world file is not found on `GZ_SIM_RESOURCE_PATH`, it falls back to default coordinates (33.810313, -118.393867).
 
+### Custom robot model
+
+Two arguments control the robot model. **Both must be changed together for a complete swap:**
+
+| Argument | Controls |
+|----------|----------|
+| `urdf_path` | Foxglove visualization and ROS TF frames |
+| `model_sdf_path` | Gazebo physics: collisions, mass, sensors, hydrodynamics, thruster plugins |
+
+Changing only `urdf_path` results in a mismatch — Foxglove shows the custom model but Gazebo continues to simulate BlueROV2 physics and collisions.
+
+```bash
+ros2 launch bluerov_sim bluerov_sim.launch.py \
+  urdf_path:=/path/to/your/robot.urdf \
+  model_sdf_path:=/path/to/your/model.sdf
+```
+
+When writing a custom URDF, mirror the joint names and TF frame names from your SDF to keep TF consistent with Gazebo.
+
+### Alternative: DAVE Underwater Camera plugin
+
+The DAVE ecosystem (`src/dave/`) includes `dave_gz_sensor_plugins::UnderwaterCamera` — a Gazebo Harmonic sensor plugin that applies physically-based underwater optics on top of a standard depth camera render. It was evaluated as an alternative to the standard Gazebo camera implemented above.
+
+**How it works:**
+- Uses `type="rgbd_camera"` sensor (depth + RGB) in SDF
+- Applies per-pixel exponential light attenuation (separate R/G/B coefficients) and background scattering using the depth buffer
+- Publishes directly to ROS 2 as `sensor_msgs/msg/Image` on `{topic}/simulated_image` — no `ros_gz_bridge` entry needed for the image
+- Reference implementation: `src/dave/models/dave_robot_models/description/bluerov2/model.sdf`
+
+**Example SDF sensor block:**
+```xml
+<sensor name="front_cam" type="rgbd_camera">
+  <update_rate>10</update_rate>
+  <always_on>1</always_on>
+  <topic>/bluerov/front_cam</topic>
+  <camera>
+    <horizontal_fov>1.05</horizontal_fov>
+    <image><width>1920</width><height>1080</height></image>
+    <clip><near>0.1</near><far>10.0</far></clip>
+  </camera>
+  <plugin filename="UnderwaterCamera" name="dave_gz_sensor_plugins::UnderwaterCamera">
+    <attenuationR>0.8</attenuationR>  <!-- murky coastal water -->
+    <attenuationG>0.5</attenuationG>
+    <attenuationB>0.2</attenuationB>
+    <backgroundR>85</backgroundR>
+    <backgroundG>107</backgroundG>
+    <backgroundB>47</backgroundB>
+  </plugin>
+</sensor>
+```
+
+**Standard Gazebo Camera (implemented) vs DAVE Underwater Camera:**
+
+| Criterion | Standard Gazebo Camera | DAVE Underwater Camera |
+|-----------|------------------------|------------------------|
+| Underwater visual realism | None — standard RGB render | Yes — per-pixel attenuation + scatter |
+| New dependencies | None | `dave_gz_sensor_plugins` + plugin path setup |
+| Plugin path risk | None | `dave_ws` install must be on `GZ_SIM_SYSTEM_PLUGIN_PATH` |
+| Rendering overhead | Low (RGB only) | Higher (~20–30%; forced depth buffer) |
+| `CameraInfo` topic | Yes (via bridge) | No |
+| Image encoding | RGB8 | BGR8 (non-standard for ROS) |
+| Topic suffix | configurable | hardcoded `{base}/simulated_image` |
+| World SDF requirement | None | `gz-sim-rgbd-camera-system` must be loaded |
+
+**Prerequisites to enable the DAVE plugin:**
+1. `dave_gz_sensor_plugins` must be built and its install lib directory added to `GZ_SIM_SYSTEM_PLUGIN_PATH`
+2. The world SDF must load the `gz-sim-rgbd-camera-system` Gazebo system plugin
+3. Any downstream ROS 2 node receiving images must handle BGR8 encoding explicitly
+4. No `CameraInfo` is published — intrinsics must be supplied separately if needed
+
+---
+
+> **SDF → URDF conversion:** No zero-setup conversion tool is available in this environment. [`sdf_to_urdf`](https://github.com/andreasBihlmaier/sdf_to_urdf) is a ROS 2 C++ package that wraps `sdformat_urdf` and provides a CLI converter. It requires cloning and `colcon build`, and is early-stage (v0.0.0, created Aug 2025). Confirmed working on Humble/Jazzy; broken on Rolling as of June 2025.
+
+---
+
 ### QGroundControl
 
-Connect QGroundControl to the MAVROS GCS bridge over UDP:
+QGroundControl runs on the **host machine** (not inside the container). Because the container uses `--network=host`, MAVROS broadcasts MAVLink telemetry on UDP 14550, which QGC picks up automatically on the same machine.
+
+Download QGC for your OS from [qgroundcontrol.com](https://qgroundcontrol.com).
+
+If the vehicle does not appear automatically after QGC starts, add a link manually:
 
 ```
 Application Settings → Comm Links → Add
@@ -321,11 +460,16 @@ Port: 14550
 | `gui`                  | `true`      | Show Gazebo GUI                                        |
 | `headless`             | `false`     | Headless (server-only) mode                            |
 | `paused`               | `false`     | Start simulation paused                                |
+| `debug`                | `false`     | Enable GDB debug mode for ArduSub SITL                 |
 | `namespace`            | `bluerov`   | Gazebo model name                                      |
 | `x` / `y` / `z`       | `0.0`       | Initial position (metres)                              |
 | `roll` / `pitch` / `yaw` | `0.0`     | Initial orientation (radians)                          |
 | `use_sim_time`         | `true`      | Use Gazebo simulation clock                            |
 | `verbose`              | `0`         | Gazebo console verbosity level                         |
+| `urdf_path`            | `<package>/urdf/bluerov2.urdf`        | Path to URDF for robot_state_publisher and Foxglove visualization |
+| `model_sdf_path`       | `<package>/models/bluerov2/model.sdf` | Path to SDF model for Gazebo spawning (physics, collisions, sensors) |
+
+> `bluerov_sim.launch.py` also unconditionally starts **robot_state_publisher**, **joint_state_publisher**, **foxglove_bridge** (WebSocket port 8765), and **world_objects_to_markers** (publishes world SDF objects as a `MarkerArray` on `/world_objects/markers`).
 
 ### `bluerov_mission.launch.py`
 
@@ -358,4 +502,18 @@ ros2 service call /mavros/cmd/arming mavros_msgs/srv/CommandBool "{value: true}"
 
 # Switch to GUIDED mode manually
 ros2 service call /mavros/set_mode mavros_msgs/srv/SetMode "{custom_mode: 'GUIDED'}"
+
+# Monitor world object markers
+ros2 topic echo /world_objects/markers
 ```
+
+### Foxglove Studio
+
+Connect Foxglove Studio to the running simulation:
+
+```
+Open Foxglove Studio → Open Connection → Rosbridge (WebSocket)
+URL: ws://localhost:8765
+```
+
+Key topics to add as panels: `/mavros/local_position/pose`, `/bluerov/odom`, `/tf`, `/world_objects/markers`.

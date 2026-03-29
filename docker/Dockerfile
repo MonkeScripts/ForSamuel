@@ -43,6 +43,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-ugly \
     gz-harmonic \
+    python3-gz-msgs10 \
+    python3-gz-transport13 \
     iputils-ping \
     libbluetooth-dev \
     libboost-all-dev \
@@ -70,6 +72,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxkbcommon-x11-0 \
     libxml2-utils \
+    libwebsocketpp-dev \
     lsb-release \
     net-tools \
     pkg-config \
@@ -99,6 +102,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-rqt-plot \
     ros-humble-rqt-topic \
     ros-humble-rviz2 \
+    ros-humble-tf-transformations \
     ros-humble-vision-msgs \
     ros-humble-xacro \
     ros-humble-image-common \
@@ -108,9 +112,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-nav2-bringup \
     ros-humble-nav2-util \
     ros-humble-nav2-common \
+    ros-humble-rosx-introspection \
+    ros-humble-sdformat-urdf \
+    ros-humble-joint-state-publisher \
     ruby \
     software-properties-common \
     sudo \
+    tmux \
     vim \
     wget \
     xterm \
@@ -169,5 +177,8 @@ RUN wget -q https://raw.githubusercontent.com/mavlink/mavros/master/mavros/scrip
 ENV GZ_SIM_SYSTEM_PLUGIN_PATH=${ARDUSUB_DIR}/ardupilot_gazebo/build
 ENV GZ_VERSION=harmonic
 ENV PATH="${ARDUSUB_DIR}/ardupilot/build/sitl/bin:${ARDUSUB_DIR}/ardupilot/Tools/autotest:/root/.local/bin:${PATH}"
+
+# ── tmuxp ─────────────────────────────────────────────────────────────────────
+RUN pip3 install --no-cache-dir tmuxp
 
 WORKDIR ${HOME_DIR}

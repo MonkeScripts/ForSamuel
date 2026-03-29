@@ -19,14 +19,6 @@ def generate_launch_description():
 
     use_dvl = LaunchConfiguration("use_dvl")
 
-    ground_truth_node = Node(
-        package="bluerov_sim",
-        executable="ground_truth_to_mavros.py",
-        name="ground_truth_to_mavros",
-        output="screen",
-        condition=UnlessCondition(use_dvl),
-    )
-
     dvl_node = Node(
         package="bluerov_sim",
         executable="dvl_to_mavros.py",
@@ -45,7 +37,6 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_dvl_arg,
-            ground_truth_node,
             dvl_node,
             movement_node,
         ]

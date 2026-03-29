@@ -1,0 +1,251 @@
+<?xml version="1.0" ?>
+<robot name="bluerov2">
+
+  <!-- ==================== base_link ==================== -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://bluerov_sim/models/bluerov2/meshes/bluerov2.dae"
+              scale="0.025 0.025 0.025"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0 0.0 0.06" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.457 0.338 0.065"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.0 0.0 0.011" rpy="0 0 0"/>
+      <mass value="10.0"/>
+      <inertia ixx="0.099" ixy="0" ixz="0"
+               iyy="0.178" iyz="0"
+               izz="0.269"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== DVL ==================== -->
+  <joint name="dvl_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="dvl_link"/>
+    <!-- SDF dvl_link pose: 0 0 -0.1 0 0 -1.57 -->
+    <origin xyz="0 0 -0.1" rpy="0 0 -1.57"/>
+  </joint>
+
+  <link name="dvl_link">
+    <collision>
+      <!-- SDF collision pose: 0 0 0 3.14159 0 0 -->
+      <origin xyz="0 0 0" rpy="3.14159 0 0"/>
+      <geometry>
+        <cylinder radius="0.093" length="0.203"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.001"/>
+      <inertia ixx="0.0195872" ixy="0" ixz="0"
+               iyy="0.0195872" iyz="0"
+               izz="0.0151357"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== Front camera ==================== -->
+  <joint name="front_cam_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_cam_link"/>
+    <!-- SDF front_cam_link pose: 0.18 0.0 0.02 0 0 0 -->
+    <origin xyz="0.18 0.0 0.02" rpy="0 0 0"/>
+  </joint>
+
+  <link name="front_cam_link">
+    <collision>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.001"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0"
+               iyy="0.0001" iyz="0"
+               izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="front_cam_optical_joint" type="fixed">
+    <parent link="front_cam_link"/>
+    <child link="front_cam_optical"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
+  <link name="front_cam_optical"/>
+
+  <!-- ==================== Bottom camera ==================== -->
+  <joint name="bottom_cam_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="bottom_cam_link"/>
+    <!-- SDF bottom_cam_link pose: 0.0 0.0 -0.05 0 1.5708 0 -->
+    <origin xyz="0.0 0.0 -0.05" rpy="0 1.5708 0"/>
+  </joint>
+
+  <link name="bottom_cam_link">
+    <collision>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.001"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0"
+               iyy="0.0001" iyz="0"
+               izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="bottom_cam_optical_joint" type="fixed">
+    <parent link="bottom_cam_link"/>
+    <child link="bottom_cam_optical"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
+  <link name="bottom_cam_optical"/>
+
+  <!-- ==================== Thruster 1 (front-right, horizontal) ==================== -->
+  <joint name="thruster1_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster1"/>
+    <!-- SDF link pose: 0.14 -0.092 0.0 -1.571 1.571 -0.785 -->
+    <origin xyz="0.14 -0.092 0.0" rpy="-1.571 1.571 -0.785"/>
+  </joint>
+
+  <link name="thruster1">
+    <visual>
+      <!-- SDF visual pose: 0 0 0 -1.571 0 0 -->
+      <origin xyz="0 0 0" rpy="-1.571 0 0"/>
+      <geometry>
+        <mesh filename="package://bluerov_sim/models/bluerov2/meshes/t200_ccw_prop.dae"/>
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.002"/>
+      <inertia ixx="0.001" ixy="0" ixz="0"
+               iyy="0.001" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== Thruster 2 (front-left, horizontal) ==================== -->
+  <joint name="thruster2_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster2"/>
+    <!-- SDF link pose: 0.14 0.092 0.0 -1.571 1.571 -2.356 -->
+    <origin xyz="0.14 0.092 0.0" rpy="-1.571 1.571 -2.356"/>
+  </joint>
+
+  <link name="thruster2">
+    <visual>
+      <!-- SDF visual pose: 0 0 0 -1.571 0 0 -->
+      <origin xyz="0 0 0" rpy="-1.571 0 0"/>
+      <geometry>
+        <mesh filename="package://bluerov_sim/models/bluerov2/meshes/t200_ccw_prop.dae"/>
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.002"/>
+      <inertia ixx="0.001" ixy="0" ixz="0"
+               iyy="0.001" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== Thruster 3 (rear-right, horizontal) ==================== -->
+  <joint name="thruster3_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster3"/>
+    <!-- SDF link pose: -0.14 -0.092 0.0 -1.571 1.571 0.785 -->
+    <origin xyz="-0.14 -0.092 0.0" rpy="-1.571 1.571 0.785"/>
+  </joint>
+
+  <link name="thruster3">
+    <visual>
+      <!-- SDF visual pose: 0 0 0 1.571 0 0 -->
+      <origin xyz="0 0 0" rpy="1.571 0 0"/>
+      <geometry>
+        <mesh filename="package://bluerov_sim/models/bluerov2/meshes/t200_cw_prop.dae"/>
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.002"/>
+      <inertia ixx="0.001" ixy="0" ixz="0"
+               iyy="0.001" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== Thruster 4 (rear-left, horizontal) ==================== -->
+  <joint name="thruster4_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster4"/>
+    <!-- SDF link pose: -0.14 0.092 0.0 -1.571 1.571 2.356 -->
+    <origin xyz="-0.14 0.092 0.0" rpy="-1.571 1.571 2.356"/>
+  </joint>
+
+  <link name="thruster4">
+    <visual>
+      <!-- SDF visual pose: 0 0 0 1.571 0 0 -->
+      <origin xyz="0 0 0" rpy="1.571 0 0"/>
+      <geometry>
+        <mesh filename="package://bluerov_sim/models/bluerov2/meshes/t200_cw_prop.dae"/>
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.002"/>
+      <inertia ixx="0.001" ixy="0" ixz="0"
+               iyy="0.001" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== Thruster 5 (right, vertical) ==================== -->
+  <joint name="thruster5_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster5"/>
+    <!-- SDF link pose: 0.0 -0.109 0.077 0 0 0 -->
+    <origin xyz="0.0 -0.109 0.077" rpy="0 0 0"/>
+  </joint>
+
+  <link name="thruster5">
+    <visual>
+      <!-- SDF visual pose: 0 0 0 -1.571 0 1.571 -->
+      <origin xyz="0 0 0" rpy="-1.571 0 1.571"/>
+      <geometry>
+        <mesh filename="package://bluerov_sim/models/bluerov2/meshes/t200_ccw_prop.dae"/>
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.002"/>
+      <inertia ixx="0.001" ixy="0" ixz="0"
+               iyy="0.001" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- ==================== Thruster 6 (left, vertical) ==================== -->
+  <joint name="thruster6_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="thruster6"/>
+    <!-- SDF link pose: 0.0 0.109 0.077 0 0 0 -->
+    <origin xyz="0.0 0.109 0.077" rpy="0 0 0"/>
+  </joint>
+
+  <link name="thruster6">
+    <visual>
+      <!-- SDF visual pose: 0 0 0 1.571 0 1.571 -->
+      <origin xyz="0 0 0" rpy="1.571 0 1.571"/>
+      <geometry>
+        <mesh filename="package://bluerov_sim/models/bluerov2/meshes/t200_cw_prop.dae"/>
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.002"/>
+      <inertia ixx="0.001" ixy="0" ixz="0"
+               iyy="0.001" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+</robot>

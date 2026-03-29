@@ -9,3 +9,27 @@
   ros_type_name: dave_interfaces/msg/DVL
   gz_type_name: gz.msgs.DVL
   direction: GZ_TO_ROS
+
+- ros_topic_name: /bluerov/front_cam/image
+  gz_topic_name: /bluerov/front_cam/image
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /bluerov/front_cam/camera_info
+  gz_topic_name: /bluerov/front_cam/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /bluerov/bottom_cam/image
+  gz_topic_name: /bluerov/bottom_cam/image
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /bluerov/bottom_cam/camera_info
+  gz_topic_name: /bluerov/bottom_cam/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS

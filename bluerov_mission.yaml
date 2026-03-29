@@ -1,0 +1,32 @@
+session_name: bluerov_mission
+start_directory: /root/HOST/bluerov_ws
+
+environment:
+  GZ_VERSION: harmonic
+
+windows:
+  - window_name: mission
+    layout: tiled
+    panes:
+      - pane_name: sim
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - >-
+            ros2 launch bluerov_sim bluerov_sim.launch.py
+            world_name:=robosub_2025_pool
+            ardusub:=true
+            mavros:=true
+            gui:=true
+
+      - pane_name: movement
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - ros2 launch bluerov_sim bluerov_mission.launch.py use_dvl:=false
+
+      - pane_name: monitor
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - echo "Foxglove Bridge → ws://localhost:8765"
