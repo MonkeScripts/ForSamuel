@@ -109,6 +109,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-mavros \
     ros-humble-mavros-extras \
     ros-humble-navigation2 \
+    ros-humble-py-trees \
+    ros-humble-py-trees-ros \
+    ros-humble-tf2-geometry-msgs \
     ros-humble-nav2-bringup \
     ros-humble-nav2-util \
     ros-humble-nav2-common \

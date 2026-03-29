@@ -14,6 +14,8 @@ install(PROGRAMS
   scripts/dvl_to_mavros.py
   scripts/bluerov_movement.py
   scripts/world_objects_to_markers.py
+  scripts/locomotion_action_server.py
+  scripts/bluerov_square_mission_tree.py
   DESTINATION lib/${PROJECT_NAME})
 
 ament_environment_hooks(hooks/setup.dsv)

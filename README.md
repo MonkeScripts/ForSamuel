@@ -20,6 +20,8 @@ ROS 2 Humble + Gazebo Harmonic workspace for **BlueROV2** simulation with **Ardu
 
 ## 1. Architecture
 
+### 1.1 Simulation stack
+
 ```
                         ┌─────────────────────────────┐
                         │        Gazebo Harmonic        │
@@ -73,6 +75,47 @@ ROS 2 Humble + Gazebo Harmonic workspace for **BlueROV2** simulation with **Ardu
                             └────────────────────┘
 ```
 
+### 1.2 Behaviour Tree mission architecture
+
+```
+                       ┌──────────────────────────────────────────────────┐
+                       │        py_trees Behaviour Tree                   │
+                       │        (bluerov_square_mission_tree.py)          │
+                       │                                                  │
+                       │  square_mission  (Sequence, memory=True)         │
+                       │  ├── arm_and_set_mode                            │
+                       │  ├── leg1_forward   x=+2, y= 0  (forward 2 m)   │
+                       │  ├── leg2_left      x= 0, y=+2  (left 2 m)      │
+                       │  ├── leg3_backward  x=-2, y= 0  (backward 2 m)  │
+                       │  └── leg4_right     x= 0, y=-2  (right 2 m)     │
+                       └──────────────────┬───────────────────────────────┘
+                                          │  ROS 2 Action  /bluerov/move_rel
+                                          │  Goal: PoseStamped (body frame) +
+                                          │        anchor_frame_name
+                                          ▼
+                       ┌──────────────────────────────────────────────────┐
+                       │  MoveRelativeActionServer                        │
+                       │  (move_relative_action_server.py)                │
+                       │                                                  │
+                       │  1. TF lookup  anchor_frame → map               │
+                       │     tf2_ros.Buffer + do_transform_pose_stamped   │
+                       │  2. Anchor offset correction                     │
+                       │     mirrors convert_to_controls_pose             │
+                       │     recalculate_target() pattern                 │
+                       │  3. Publish /mavros/setpoint_position/local      │
+                       │     at 1 Hz (higher rates cause replanning)      │
+                       │  4. Poll /mavros/local_position/pose             │
+                       │     → succeed / abort on dist/yaw threshold      │
+                       └──────────────────┬───────────────────────────────┘
+                                          │ /mavros/setpoint_position/local
+                                          ▼
+                              [ MAVROS → ArduSub SITL → Thrusters ]
+```
+
+**Setpoint offsets** are expressed in the `base_link` (FLU) frame — `+x` forward, `+y` left, `+z` up. The action server transforms each offset to the `map` frame via TF2 at the time each leg starts, so legs are always relative to the robot's current position.
+
+**Anchor frame** (`anchor_frame_name` goal field) allows goals to target any vehicle frame (camera, gripper, …) rather than `base_link`. When `anchor_frame_name = "base_link"` the correction is a no-op (pure body-relative movement). This mirrors the `recalculate_target()` pattern from `frames/scripts/convert_to_controls_pose.py`.
+
 **ArduSub** is the production firmware for real BlueROV2 hardware. Running ArduSub SITL means parameter files, GCS connections, and MAVLink command sequences are identical between simulation and vehicle. **MAVROS** provides the ROS 2 abstraction layer so mission scripts require no changes when moving from simulation to hardware.
 
 ---
@@ -106,11 +149,19 @@ bluerov_ws/
 │       │   └── bluerov2.urdf              # Robot description for TF / Foxglove visualisation
 │       ├── worlds/                        # World files owned by this package
 │       │   └── robosub_2025_pool.world
+│       ├── action/
+│       │   └── MoveRelativePose.action    # ROS 2 action: body-frame setpoint
+│       ├── bluerov_sim/                   # Python package (importable after build)
+│       │   ├── arm_and_set_mode.py        # py_trees: arm + GUIDED mode behaviour
+│       │   ├── move_relative_behaviour.py # py_trees: MoveRelativePose action client
+│       │   └── move_relative_action_server.py  # ROS 2 action server class
 │       └── scripts/
 │           ├── ground_truth_to_mavros.py  # Gazebo odometry → MAVROS
 │           ├── dvl_to_mavros.py           # DVL + GT pose → MAVROS
-│           ├── bluerov_movement.py        # Square waypoint mission
-│           └── world_objects_to_markers.py # World SDF → RViz/Foxglove MarkerArray
+│           ├── bluerov_movement.py        # Square waypoint mission (state-machine)
+│           ├── world_objects_to_markers.py # World SDF → RViz/Foxglove MarkerArray
+│           ├── move_relative_action_server.py  # Entry point for action server
+│           └── bluerov_square_mission_tree.py  # py_trees square mission entry point
 ├── docker/
 │   └── Dockerfile               # ROS 2 Humble + Gazebo Harmonic + ArduSub SITL
 ├── build.bash                   # Docker image build wrapper
@@ -303,6 +354,33 @@ ros2 launch bluerov_sim bluerov_mission.launch.py use_dvl:=false
 The mission arms the vehicle, switches to GUIDED mode, then navigates a square at -2 m depth:
 `(0,0,-2)` → `(5,0,-2)` → `(5,5,-2)` → `(0,5,-2)` → `(0,0,-2)`
 
+### Behaviour tree square mission
+
+Uses a py_trees behaviour tree with a ROS 2 action server. Setpoints are expressed in the `base_link` body frame and transformed to `map` frame at runtime.
+
+```bash
+# Terminal 1 — Simulation
+source install/setup.bash
+ros2 launch bluerov_sim bluerov_sim.launch.py \
+  world_name:=empty.sdf \
+  ardusub:=true \
+  mavros:=true \
+  gui:=true
+
+# Terminal 2 — Action server + BT mission
+source install/setup.bash
+ros2 launch bluerov_sim bluerov_square_bt.launch.py
+```
+
+The mission arms the vehicle, switches to GUIDED mode, then drives a 2 m × 2 m square:
+`leg1 forward (+x=2)` → `leg2 left (+y=2)` → `leg3 backward (x=-2)` → `leg4 right (y=-2)`
+
+Monitor the action server:
+```bash
+ros2 action list          # /bluerov/move_rel should appear
+ros2 action status /bluerov/move_rel
+```
+
 ### DVL-based odometry
 
 Uses the Nortek DVL500-300 sensor for velocity, fused with ground truth pose.
@@ -476,6 +554,10 @@ Port: 14550
 | Argument  | Default | Description                                                              |
 | --------- | ------- | ------------------------------------------------------------------------ |
 | `use_dvl` | `false` | Use `dvl_to_mavros.py`; `false` uses `ground_truth_to_mavros.py`         |
+
+### `bluerov_square_bt.launch.py`
+
+No launch arguments. Starts `ground_truth_to_mavros`, `move_relative_action_server`, and `bluerov_square_mission_tree` together. Requires the simulation to be running first.
 
 ---
 

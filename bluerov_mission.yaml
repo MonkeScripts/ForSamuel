@@ -12,18 +12,23 @@ windows:
         shell_command:
           - source /opt/ros/humble/setup.bash
           - source install/setup.bash
-          - >-
-            ros2 launch bluerov_sim bluerov_sim.launch.py
+          - ros2 launch bluerov_sim bluerov_sim.launch.py
             world_name:=robosub_2025_pool
             ardusub:=true
             mavros:=true
             gui:=true
 
-      - pane_name: movement
+      # - pane_name: movement
+      #   shell_command:
+      #     - source /opt/ros/humble/setup.bash
+      #     - source install/setup.bash
+      #     - ros2 launch bluerov_sim bluerov_mission.launch.py use_dvl:=false
+
+      - pane_name: bt_mission
         shell_command:
           - source /opt/ros/humble/setup.bash
           - source install/setup.bash
-          - ros2 launch bluerov_sim bluerov_mission.launch.py use_dvl:=false
+          - ros2 launch bluerov_sim bluerov_square_bt.launch.py
 
       - pane_name: monitor
         shell_command:
