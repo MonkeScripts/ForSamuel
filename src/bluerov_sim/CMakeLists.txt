@@ -16,6 +16,9 @@ install(PROGRAMS
   scripts/world_objects_to_markers.py
   scripts/locomotion_action_server.py
   scripts/bluerov_square_mission_tree.py
+  scripts/node_registry.py
+  scripts/arm_and_set_mode.py
+  scripts/goto.py
   DESTINATION lib/${PROJECT_NAME})
 
 ament_environment_hooks(hooks/setup.dsv)

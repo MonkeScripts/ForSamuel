@@ -21,15 +21,22 @@ Run:
     ros2 launch bluerov_sim bluerov_square_bt.launch.py
 """
 
+import os
+import sys
+
+_DIR = os.path.dirname(os.path.abspath(__file__))
+if _DIR not in sys.path:
+    sys.path.insert(0, _DIR)
+
 import math
 import traceback
 
 import py_trees
 import py_trees.console as console
 import rclpy
-from bluerov_sim.arm_and_set_mode import ArmAndSetMode
-from bluerov_sim.goto import FromConstant as Goto
-from bluerov_sim.node_registry import BlueROVTreeNode
+from arm_and_set_mode import ArmAndSetMode
+from goto import FromConstant as Goto
+from node_registry import BlueROVTreeNode
 from geometry_msgs.msg import PoseStamped
 from mission_planner_2.common.core.bumble_tree import BumbleTree
 from mission_planner_2.common.core.hooks import stop_on_success_or_failure

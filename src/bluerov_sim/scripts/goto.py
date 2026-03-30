@@ -6,6 +6,13 @@ Overrides the action registry to point at /bluerov/controls and the service
 registry to point at /bluerov/convert_to_controls_pose (frames package).
 The anchor frame defaults to 'base_link' (FLU body frame).
 """
+import os
+import sys
+
+_DIR = os.path.dirname(os.path.abspath(__file__))
+if _DIR not in sys.path:
+    sys.path.insert(0, _DIR)
+
 import math
 import uuid
 from typing import Any, Callable
@@ -13,7 +20,7 @@ from typing import Any, Callable
 import py_trees
 from geometry_msgs.msg import PoseStamped
 
-from bluerov_sim.node_registry import BlueROVSharedAction, BlueROVSharedService
+from node_registry import BlueROVSharedAction, BlueROVSharedService
 from mission_planner_2.vehicles.auv.trees.goto import goto as auv_goto
 from mission_planner_2.vehicles.shared.trees.blackboard import convert_to_safe_name
 from mission_planner_2.vehicles.shared.trees.goto import goto_base
