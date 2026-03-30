@@ -23,98 +23,61 @@ ROS 2 Humble + Gazebo Harmonic workspace for **BlueROV2** simulation with **Ardu
 ### 1.1 Simulation stack
 
 ```
-                        ┌─────────────────────────────┐
-                        │        Gazebo Harmonic        │
-                        │                               │
-                        │  BlueROV2 model (SDF)         │
-                        │  ├─ 6 thrusters               │
-                        │  ├─ BuoyancyPlugin             │
-                        │  ├─ HydrodynamicsPlugin        │
-                        │  ├─ IMU sensor                 │
-                        │  └─ DVL sensor (Nortek 500)    │
-                        └──────┬────────────────┬───────┘
-                               │ JSON over UDP  │ Gazebo topics
-                               ▼                ▼
-                 ┌─────────────────────┐  ┌────────────────────────┐
-                 │  ArduPilot Gazebo   │  │     ros_gz_bridge       │
-                 │  Plugin             │  │                         │
-                 │  (libArduPilot      │  │  /bluerov/odom          │
-                 │   Plugin.so)        │  │  /bluerov/dvl/velocity  │
-                 └──────────┬──────────┘  └──────────┬─────────────┘
-                            │ MAVLink TCP :5760        │ ROS 2 topics
-                            ▼                          ▼
-                 ┌─────────────────────┐  ┌────────────────────────┐
-                 │   ArduSub SITL      │  │   Odometry Node         │
-                 │                     │  │                         │
-                 │  EKF3 fuses:        │  │  ground_truth_to_       │
-                 │  ├─ external nav    │  │  mavros.py              │
-                 │  └─ barometer (Z)   │  │      ── OR ──           │
-                 └──────────┬──────────┘  │  dvl_to_mavros.py      │
-                            │ MAVLink TCP  └──────────┬─────────────┘
-                            ▼                         │ /mavros/odometry/out
-                 ┌─────────────────────────────────────────────────┐
-                 │                    MAVROS                        │
-                 │  /mavros/setpoint_position/local  (input)        │
-                 │  /mavros/local_position/pose      (output)       │
-                 │  /mavros/state                    (output)       │
-                 └──────────────────────┬──────────────────────────┘
-                                        │ ROS 2
-                                        ▼
-                       ┌────────────────────────────────┐
-                       │   bluerov_movement.py           │
-                       │                                 │
-                       │  INIT → ARM → GUIDED →          │
-                       │  WAYPOINT (4 pts, -2m depth) →  │
-                       │  FINISHED                        │
-                       └────────────────────────────────┘
-                                        │ UDP 14550
-                                        ▼
-                            ┌────────────────────┐
-                            │   QGroundControl   │
-                            │   (GCS, optional)  │
-                            └────────────────────┘
+Gazebo Harmonic
+  ├─ JSON over UDP ──────► ArduPilot Gazebo Plugin ─── MAVLink TCP :5760 ──► ArduSub SITL
+  └─ Gazebo topics ──────► ros_gz_bridge                                           │
+                                 │                                                  │ MAVLink TCP
+                                 │ ROS 2 topics                                     │
+                                 ▼                                                  ▼
+                           Odometry Node ──── /mavros/odometry/out ──────────► MAVROS
+                      (ground_truth_to_mavros.py                            ├─► bluerov_movement.py
+                           or dvl_to_mavros.py)                             └─► QGroundControl (UDP 14550)
 ```
+
+| Component | Role |
+|-----------|------|
+| **Gazebo Harmonic** | Simulates BlueROV2 — 6 thrusters, BuoyancyPlugin, HydrodynamicsPlugin, IMU, DVL (Nortek 500) |
+| **ArduPilot Gazebo Plugin** | Bridges Gazebo physics to ArduSub via JSON over UDP (`libArduPilotPlugin.so`) |
+| **ArduSub SITL** | Flight controller firmware; EKF3 fuses external nav + barometer (Z) |
+| **ros_gz_bridge** | Forwards `/bluerov/odom` and `/bluerov/dvl/velocity` to ROS 2 |
+| **Odometry Node** | `ground_truth_to_mavros.py` or `dvl_to_mavros.py` — feeds `/mavros/odometry/out` |
+| **MAVROS** | ROS 2 ↔ MAVLink bridge; exposes `/mavros/setpoint_position/local` (in) and `/mavros/local_position/pose` (out) |
+| **bluerov_movement.py** | State-machine mission: `INIT → ARM → GUIDED → WAYPOINT → FINISHED` |
+| **QGroundControl** | GCS — connects automatically via UDP 14550 |
 
 ### 1.2 Behaviour Tree mission architecture
 
 ```
-                       ┌──────────────────────────────────────────────────┐
-                       │        py_trees Behaviour Tree                   │
-                       │        (bluerov_square_mission_tree.py)          │
-                       │                                                  │
-                       │  square_mission  (Sequence, memory=True)         │
-                       │  ├── arm_and_set_mode                            │
-                       │  ├── leg1_forward   x=+2, y= 0  (forward 2 m)   │
-                       │  ├── leg2_left      x= 0, y=+2  (left 2 m)      │
-                       │  ├── leg3_backward  x=-2, y= 0  (backward 2 m)  │
-                       │  └── leg4_right     x= 0, y=-2  (right 2 m)     │
-                       └──────────────────┬───────────────────────────────┘
-                                          │  ROS 2 Action  /bluerov/move_rel
-                                          │  Goal: PoseStamped (body frame) +
-                                          │        anchor_frame_name
-                                          ▼
-                       ┌──────────────────────────────────────────────────┐
-                       │  MoveRelativeActionServer                        │
-                       │  (move_relative_action_server.py)                │
-                       │                                                  │
-                       │  1. TF lookup  anchor_frame → map               │
-                       │     tf2_ros.Buffer + do_transform_pose_stamped   │
-                       │  2. Anchor offset correction                     │
-                       │     mirrors convert_to_controls_pose             │
-                       │     recalculate_target() pattern                 │
-                       │  3. Publish /mavros/setpoint_position/local      │
-                       │     at 1 Hz (higher rates cause replanning)      │
-                       │  4. Poll /mavros/local_position/pose             │
-                       │     → succeed / abort on dist/yaw threshold      │
-                       └──────────────────┬───────────────────────────────┘
-                                          │ /mavros/setpoint_position/local
-                                          ▼
-                              [ MAVROS → ArduSub SITL → Thrusters ]
+py_trees Behaviour Tree  (bluerov_square_mission_tree.py)
+  square_mission — Sequence, memory=True
+  ├── arm_and_set_mode
+  ├── leg1_forward   x=+2, y= 0  (forward 2 m)
+  ├── leg2_left      x= 0, y=+2  (left 2 m)
+  ├── leg3_backward  x=−2, y= 0  (backward 2 m)
+  └── leg4_right     x= 0, y=−2  (right 2 m)
+         │
+         │ GetPoseToControlsFrame service
+         │ /bluerov/convert_to_controls_pose  (base_link → map)
+         ▼
+  ConvertToControlsPose  (frames/scripts/convert_to_controls_pose.py)
+    controls_frame: map  |  base_frame: base_link  |  odom: /mavros/odometry/out
+         │
+         │ ROS 2 Action  /bluerov/controls
+         │ Goal: Locomotion (map-frame pose, move_rel=False)
+         ▼
+  LocomotionActionServer  (locomotion_action_server.py)
+    1. Accept map-frame setpoint
+    2. Publish /mavros/setpoint_position/local at 1 Hz
+    3. Poll /mavros/local_position/pose → succeed / abort on threshold
+         │
+         │ /mavros/setpoint_position/local
+         ▼
+  MAVROS → ArduSub SITL → Thrusters
 ```
 
-**Setpoint offsets** are expressed in the `base_link` (FLU) frame — `+x` forward, `+y` left, `+z` up. The action server transforms each offset to the `map` frame via TF2 at the time each leg starts, so legs are always relative to the robot's current position.
+**Setpoint offsets** are expressed in the `base_link` (FLU) frame — `+x` forward, `+y` left, `+z` up. The `ConvertToControlsPose` service (from the `frames` package) converts each body-frame pose to the `map` frame using odometry, so legs are always relative to the robot's current position.
 
-**Anchor frame** (`anchor_frame_name` goal field) allows goals to target any vehicle frame (camera, gripper, …) rather than `base_link`. When `anchor_frame_name = "base_link"` the correction is a no-op (pure body-relative movement). This mirrors the `recalculate_target()` pattern from `frames/scripts/convert_to_controls_pose.py`.
+**Anchor frame** (`anchor_frame_name` goal field, default `base_link`) allows goals to target any vehicle frame (camera, gripper, …). The `recalculate_target()` path inside `ConvertToControlsPose` handles the offset correction; when `anchor_frame_name = "base_link"` it is a no-op.
 
 **ArduSub** is the production firmware for real BlueROV2 hardware. Running ArduSub SITL means parameter files, GCS connections, and MAVLink command sequences are identical between simulation and vehicle. **MAVROS** provides the ROS 2 abstraction layer so mission scripts require no changes when moving from simulation to hardware.
 
@@ -132,8 +95,15 @@ bluerov_ws/
 │   │   ├── dave_gz_sensor_plugins/
 │   │   ├── dave_gz_world_plugins/
 │   │   └── dave_ros_gz_plugins/
+│   ├── bb_msgs/                 # Shared ROS 2 message/service/action definitions
+│   │   └── bb_planner_msgs/     # GetPoseToControlsFrame service
 │   ├── bb_worlds/               # Competition worlds (RoboSub 2023/2025, SAUVC 2024)
 │   ├── foxglove-sdk/            # Foxglove bridge (built from source; see §3)
+│   ├── frames/                  # Frame conversion utilities (C++17 + ROS 2 Python nodes)
+│   │   ├── include/             # Header-only compile-time frame library
+│   │   └── scripts/
+│   │       └── convert_to_controls_pose.py  # GetPoseToControlsFrame service node
+│   ├── mission_planner_2/       # AUV/BlueROV behaviour tree infrastructure
 │   └── bluerov_sim/             # Main orchestrator package
 │       ├── config/
 │       │   ├── ardusub.parm                # EKF3 external nav parameters
@@ -141,26 +111,24 @@ bluerov_ws/
 │       │   └── bluerov_gz_bridge_full.yaml # Gazebo bridge: odom + DVL
 │       ├── launch/
 │       │   ├── bluerov_sim.launch.py       # Gazebo + ArduSub SITL + MAVROS + Foxglove
-│       │   └── bluerov_mission.launch.py   # Odometry node + waypoint mission
+│       │   ├── bluerov_mission.launch.py   # Odometry node + waypoint mission
+│       │   └── bluerov_square_bt.launch.py # Locomotion server + frames service + BT mission
 │       ├── mavros_params/
 │       │   └── sim_mavros_params.yaml
 │       ├── models/bluerov2/               # BlueROV2 SDF model with DVL + IMU
 │       ├── urdf/
 │       │   └── bluerov2.urdf              # Robot description for TF / Foxglove visualisation
-│       ├── worlds/                        # World files owned by this package
-│       │   └── robosub_2025_pool.world
-│       ├── action/
-│       │   └── MoveRelativePose.action    # ROS 2 action: body-frame setpoint
 │       ├── bluerov_sim/                   # Python package (importable after build)
 │       │   ├── arm_and_set_mode.py        # py_trees: arm + GUIDED mode behaviour
-│       │   ├── move_relative_behaviour.py # py_trees: MoveRelativePose action client
-│       │   └── move_relative_action_server.py  # ROS 2 action server class
+│       │   ├── goto.py                    # py_trees: Locomotion action client (BlueROV wrapper)
+│       │   ├── locomotion_action_server.py # ROS 2 Locomotion action server
+│       │   └── node_registry.py           # BlueROVTreeNode, BlueROVSharedAction/Service enums
 │       └── scripts/
-│           ├── ground_truth_to_mavros.py  # Gazebo odometry → MAVROS
+│           ├── ground_truth_to_mavros.py  # Gazebo odometry → MAVROS + map→base_link TF
 │           ├── dvl_to_mavros.py           # DVL + GT pose → MAVROS
 │           ├── bluerov_movement.py        # Square waypoint mission (state-machine)
 │           ├── world_objects_to_markers.py # World SDF → RViz/Foxglove MarkerArray
-│           ├── move_relative_action_server.py  # Entry point for action server
+│           ├── locomotion_action_server.py # Entry point for Locomotion action server
 │           └── bluerov_square_mission_tree.py  # py_trees square mission entry point
 ├── docker/
 │   └── Dockerfile               # ROS 2 Humble + Gazebo Harmonic + ArduSub SITL
@@ -177,6 +145,7 @@ bluerov_ws/
 | `ardupilot_gazebo`  | ArduPilot/ardupilot_gazebo | Pinned commit; JSON-UDP bridge plugin      |
 | `dave`              | IOES-Lab/dave              | Pinned commit; sensor plugins + interfaces |
 | `bb_worlds`         | BumblebeeAS/bb_worlds      | `main` branch; RoboSub/SAUVC worlds        |
+| `frames`            | BumblebeeAS/frames         | Pinned commit; frame conversion utilities  |
 
 ---
 
@@ -263,58 +232,17 @@ Then build it as part of the normal workspace build — no separate `make` step 
 ---
 
 ## 4. Building the Workspace
+Clone all repositories via `vcs`:
+```bash
+vcs import src < bluerov_ws.repos
+```
 
-Run these steps inside the container. Packages must be built in dependency order — source after each tier to activate `setup.dsv` environment hooks.
+In the container terminal, build the workspace with `colcon`:
 
 ```bash
 cd /root/HOST/bluerov_ws
 source /opt/ros/humble/setup.bash
-export GZ_VERSION=harmonic
-
-# Import all repos
-vcs import src < bluerov_ws.repos
-
-# Install ROS deps
-rosdep update
-rosdep install --from-paths src --ignore-src -r -y \
-  --skip-keys "ardupilot_gazebo orb_slam_2_ros gz-harmonic"
-
-# Tier 1: Gazebo plugin (sets GZ_SIM_SYSTEM_PLUGIN_PATH)
-colcon build \
-  --packages-select ardupilot_gazebo \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
-source install/setup.bash
-
-# Tier 2: ROS interface definitions
-colcon build --packages-select dave_interfaces
-
-# Tier 3: Gazebo sensor and world plugins
-colcon build \
-  --packages-select dave_gz_world_plugins dave_gz_sensor_plugins
-
-# Tier 4: ROS-Gazebo bridge plugins
-colcon build \
-  --packages-select dave_gz_model_plugins dave_ros_gz_plugins
-
-# Tier 5: Foxglove bridge
-colcon build --packages-select foxglove_bridge
-
-# Tier 6: All remaining packages
-colcon build \
-  --packages-select dave bluerov_sim bb_worlds
-
-source install/setup.bash
-```
-
-**Subsequent rebuilds** (no tier ordering needed):
-
-```bash
-source /opt/ros/humble/setup.bash
-export GZ_VERSION=harmonic
-colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
-source install/setup.bash
-```
-
+colcon build --symlink-install
 ---
 
 ## 5. Running Simulations
@@ -330,7 +258,7 @@ tmuxp load bluerov_mission.yaml
 | Pane | Contents |
 | ---- | -------- |
 | sim | `bluerov_sim.launch.py` with `world_name:=robosub_2025_pool`, ArduSub + MAVROS + GUI |
-| movement | `bluerov_mission.launch.py use_dvl:=false` |
+| bt_mission | `bluerov_square_bt.launch.py` — locomotion server + frames service + BT mission |
 | monitor | Foxglove connection info — open `ws://localhost:8765` in Foxglove Studio |
 
 ---
@@ -338,10 +266,11 @@ tmuxp load bluerov_mission.yaml
 ### Ground truth odometry (simplest)
 
 ```bash
+> Ensure that QGC is open on the host machine to receive MAVLink telemetry (UDP 14550)
 # Terminal 1 — Simulation
 source install/setup.bash
 ros2 launch bluerov_sim bluerov_sim.launch.py \
-  world_name:=empty.sdf \
+  world_name:=robosub_2025_pool \
   ardusub:=true \
   mavros:=true \
   gui:=true
@@ -375,10 +304,10 @@ ros2 launch bluerov_sim bluerov_square_bt.launch.py
 The mission arms the vehicle, switches to GUIDED mode, then drives a 2 m × 2 m square:
 `leg1 forward (+x=2)` → `leg2 left (+y=2)` → `leg3 backward (x=-2)` → `leg4 right (y=-2)`
 
-Monitor the action server:
+Monitor the action server and frame conversion service:
 ```bash
-ros2 action list          # /bluerov/move_rel should appear
-ros2 action status /bluerov/move_rel
+ros2 action list          # /bluerov/controls should appear
+ros2 service list | grep convert_to_controls_pose   # /bluerov/convert_to_controls_pose
 ```
 
 ### DVL-based odometry
@@ -557,7 +486,7 @@ Port: 14550
 
 ### `bluerov_square_bt.launch.py`
 
-No launch arguments. Starts `ground_truth_to_mavros`, `move_relative_action_server`, and `bluerov_square_mission_tree` together. Requires the simulation to be running first.
+No launch arguments. Starts `locomotion_action_server`, `convert_to_controls_pose` (frames package, configured for `map`/`base_link`), and `bluerov_square_mission_tree` together. Requires the simulation to be running first.
 
 ---
 

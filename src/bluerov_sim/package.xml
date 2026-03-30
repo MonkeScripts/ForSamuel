@@ -33,6 +33,8 @@
   <exec_depend>foxglove_bridge</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
   <exec_depend>bb_controls_msgs</exec_depend>
+  <exec_depend>bb_planner_msgs</exec_depend>
+  <exec_depend>frames</exec_depend>
   <exec_depend>py_trees</exec_depend>
   <exec_depend>py_trees_ros</exec_depend>
   <exec_depend>mission_planner_2</exec_depend>

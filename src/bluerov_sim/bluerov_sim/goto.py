@@ -2,8 +2,8 @@
 """
 BlueROV2 goto behaviours — thin wrappers over the AUV Locomotion action pattern.
 
-Overrides the action registry to point at /bluerov/controls and defaults
-is_relative_movement=True so the GetPoseToControlsFrame service is bypassed.
+Overrides the action registry to point at /bluerov/controls and the service
+registry to point at /bluerov/convert_to_controls_pose (frames package).
 The anchor frame defaults to 'base_link' (FLU body frame).
 """
 import math
@@ -13,7 +13,7 @@ from typing import Any, Callable
 import py_trees
 from geometry_msgs.msg import PoseStamped
 
-from bluerov_sim.node_registry import BlueROVSharedAction
+from bluerov_sim.node_registry import BlueROVSharedAction, BlueROVSharedService
 from mission_planner_2.vehicles.auv.trees.goto import goto as auv_goto
 from mission_planner_2.vehicles.shared.trees.blackboard import convert_to_safe_name
 from mission_planner_2.vehicles.shared.trees.goto import goto_base
@@ -25,7 +25,7 @@ class FromBlackboard(auv_goto.FromBlackboard):
 
     Identical to auv.goto.FromBlackboard except:
     - Connects to /bluerov/controls (BlueROVSharedAction.LOCOMOTION)
-    - is_relative_movement=True by default (bypasses GetPoseToControlsFrame)
+    - Uses /bluerov/convert_to_controls_pose for frame conversion (frames package)
     - anchor_frame_name defaults to 'base_link'
     - Relaxed tolerances for MAVROS-based control
     """
@@ -45,20 +45,18 @@ class FromBlackboard(auv_goto.FromBlackboard):
         generate_feedback_message: Callable[[Any], str] = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
-        is_relative_movement: bool = True,
+        is_relative_movement: bool = False,
         depth_override_value: float | None = None,
     ):
         # Call goto_base.FromBlackboard.__init__ directly to inject
         # BlueROVSharedAction.LOCOMOTION instead of the hardcoded
         # AUVSharedAction.LOCOMOTION in auv.goto.FromBlackboard.__init__.
-        # service_client_type=None is safe because is_relative_movement=True
-        # causes setup() to return before the service client is accessed.
         goto_base.FromBlackboard.__init__(
             self,
             name=name,
             pose_key=pose_key,
             action_client_type=BlueROVSharedAction.LOCOMOTION,
-            service_client_type=None,
+            service_client_type=BlueROVSharedService.CONVERT_TO_CONTROLS_POSE,
             anchor_frame_name=anchor_frame_name,
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
@@ -81,6 +79,7 @@ class FromConstant(FromBlackboard):
 
     Set pose.header.frame_id = 'base_link' for body-relative movement.
     Pose coordinates follow FLU convention: +x=forward, +y=left, +z=up.
+    The ConvertToControlsPose service converts to the map frame before dispatch.
 
     Example — move 2 m forward:
         Goto('leg1', pose=_make_pose(x=2.0, y=0.0))
@@ -101,7 +100,7 @@ class FromConstant(FromBlackboard):
         generate_feedback_message: Callable[[Any], str] = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
-        is_relative_movement: bool = True,
+        is_relative_movement: bool = False,
         depth_override_value: float | None = None,
     ):
         if not isinstance(pose, list):

@@ -23,3 +23,9 @@ repositories:
     url: https://github.com/BumblebeeAS/bb_worlds.git
     version: main
     depth: 1
+
+  frames:
+    type: git
+    url: https://github.com/BumblebeeAS/frames.git
+    version: 7e3cc44136bd7718c06a2d1374a193933d494123
+    depth: 1
