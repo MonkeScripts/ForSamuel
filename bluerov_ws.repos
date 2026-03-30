@@ -18,6 +18,18 @@ repositories:
     version: 2e236fa32e0bbf8daa40e51cd2edce7c629f66f5
     depth: 1
 
+  bb_msgs:
+    type: git
+    url: https://github.com/BumblebeeAS/bb_msgs.git
+    version: main
+    depth: 1
+
+  mission_planner_2:
+    type: git
+    url: https://github.com/BumblebeeAS/mission_planner_2.git
+    version: main
+    depth: 1
+
   bb_worlds:
     type: git
     url: https://github.com/BumblebeeAS/bb_worlds.git
