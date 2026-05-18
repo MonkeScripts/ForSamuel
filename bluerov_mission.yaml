@@ -1,3 +1,9 @@
+# tmuxp session: full BlueROV2 sim + behaviour-tree square mission.
+# Load with:  tmuxp load bluerov_mission.yaml
+#
+# Opens one tmux window with two tiled panes. See the per-pane comments
+# below for exactly what each one starts.
+
 session_name: bluerov_mission
 start_directory: /root/HOST/bluerov_ws
 
@@ -8,6 +14,18 @@ windows:
   - window_name: mission
     layout: tiled
     panes:
+
+      # ── sim ────────────────────────────────────────────────────────────────
+      # Brings up everything needed for the vehicle to exist and be reachable:
+      #   • Gazebo Harmonic with the RoboSub 2025 pool world
+      #   • ArduSub SITL (same firmware that runs on the real BlueROV2)
+      #   • MAVROS — ROS 2 ↔ MAVLink bridge (publishes /mavros/local_position/pose,
+      #     accepts setpoints on /mavros/setpoint_position/local, broadcasts MAVLink
+      #     telemetry on UDP 14550 for QGroundControl on the host)
+      #   • foxglove_bridge on ws://localhost:8765
+      #   • ground_truth_to_mavros — feeds Gazebo odom into /mavros/odometry/out
+      #     and broadcasts the map→base_link TF
+      #   • world_objects_to_markers — publishes world SDF objects as MarkerArray
       - pane_name: sim
         shell_command:
           - source /opt/ros/humble/setup.bash
@@ -18,20 +36,18 @@ windows:
             mavros:=true
             gui:=true
 
-      # - pane_name: movement
-      #   shell_command:
-      #     - source /opt/ros/humble/setup.bash
-      #     - source install/setup.bash
-      #     - ros2 launch bluerov_sim bluerov_mission.launch.py use_dvl:=false
-
+      # ── bt_mission ─────────────────────────────────────────────────────────
+      # The mission itself. Starts three nodes:
+      #   • locomotion_action_server — bb_controls_msgs/Locomotion server on
+      #     /bluerov/controls; converts map-frame goals into 1 Hz setpoints
+      #     published to /mavros/setpoint_position/local
+      #   • convert_to_controls_pose (frames package) — service that converts
+      #     body-frame (base_link) poses to the map frame using current odometry
+      #   • bluerov_square_mission_tree — py_trees behaviour tree that arms the
+      #     vehicle, switches to GUIDED, and drives a 2 m × 2 m square in body
+      #     frame: forward → left → backward → right
       - pane_name: bt_mission
         shell_command:
           - source /opt/ros/humble/setup.bash
           - source install/setup.bash
           - ros2 launch bluerov_sim bluerov_square_bt.launch.py
-
-      - pane_name: monitor
-        shell_command:
-          - source /opt/ros/humble/setup.bash
-          - source install/setup.bash
-          - echo "Foxglove Bridge → ws://localhost:8765"

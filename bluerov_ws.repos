@@ -21,19 +21,19 @@ repositories:
   bb_msgs:
     type: git
     url: https://github.com/BumblebeeAS/bb_msgs.git
-    version: main
+    version: 79e02c50e3c3ef8344d4f2b2fcf76d3999ed75f6
     depth: 1
 
   mission_planner_2:
     type: git
     url: https://github.com/BumblebeeAS/mission_planner_2.git
-    version: main
+    version: 49f6614de8f6b4795f85e54a39acccde5638de6b
     depth: 1
 
   bb_worlds:
     type: git
     url: https://github.com/BumblebeeAS/bb_worlds.git
-    version: main
+    version: 94f8d42d8a13c34ffe5226f8cce01096df40c87b
     depth: 1
 
   frames:
