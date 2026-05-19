@@ -5,16 +5,20 @@ Original kept hardcoded `auv4/base_link_ned` (module constant) and
 factory. Both are now keyword-arg-parameterised with BlueROV defaults
 so the bin/torpedo trees can use them as-is.
 
-The downstream goto.* objects also default to `auv4/base_link_ned`, so
-every `goto.NFromConstant`/`FromConstant` call now passes
-`anchor_frame_name=base_link_frame` explicitly.
+The goto.* objects come from scripts/goto.py (BlueROV-routed wrappers over
+the upstream auv goto), so `anchor_frame_name=base_link_frame` is the
+BlueROV default and would no longer need an explicit override — kept for
+clarity at call sites.
 """
 
+import os
+import sys
 from typing import List
 
 import numpy as np
 import py_trees
 import py_trees_ros
+from ament_index_python.packages import get_package_prefix
 from bb_perception_msgs.srv import ClusterTfSrv
 from geometry_msgs.msg import PoseStamped
 from py_trees_ros.subscribers import operator
@@ -24,11 +28,24 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_request,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
+
+# scripts/goto.py is installed to lib/bluerov_sim/ by ament_cmake `install(PROGRAMS)`,
+# not inside this Python package. Reach it via the ament prefix instead of a
+# brittle relative path. Same idiom as bluerov_sim/bins/bins.py.
+_BLUEROV_SCRIPTS_DIR = os.path.join(
+    get_package_prefix("bluerov_sim"), "lib", "bluerov_sim"
+)
+if _BLUEROV_SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _BLUEROV_SCRIPTS_DIR)
+import goto  # noqa: E402  (bluerov_sim/scripts/goto.py)
 
 DEFAULT_BASE_LINK_FRAME = "base_link"
 DEFAULT_CLUSTER_SRV_NAME = "/bluerov/cluster_tfs_srv"
+# Upstream defaults out_parents="world_ned" (AUV4 NED world). Our BlueROV stack
+# uses map/ENU (see scripts/ground_truth_to_mavros.py — header.frame_id="map").
+# Threaded into every create_clustering_request call below.
+DEFAULT_OUT_PARENTS_FRAME = "map"
 
 
 def _to_top_left(f: float, l: float, start_xy: np.ndarray) -> np.ndarray:
@@ -149,6 +166,7 @@ def create_search_bot_constant_root(
             enabled=True,
             in_children=object_frame,
             out_children=object_frame_clustered,
+            out_parents=DEFAULT_OUT_PARENTS_FRAME,
             persistent=False,
         ),
     )
@@ -162,6 +180,7 @@ def create_search_bot_constant_root(
             persistent=False,
             in_children=object_frame,
             out_children=object_frame_clustered,
+            out_parents=DEFAULT_OUT_PARENTS_FRAME,
         ),
     )
 
@@ -213,6 +232,7 @@ def create_homing_search_bot_layered_square_root(
                 enabled=True,
                 in_children=object_frame,
                 out_children=object_frame_clustered,
+                out_parents=DEFAULT_OUT_PARENTS_FRAME,
                 persistent=persistent,
                 min_cluster_size=min_cluster_size,
             ),
@@ -228,6 +248,7 @@ def create_homing_search_bot_layered_square_root(
                 persistent=persistent,
                 in_children=object_frame,
                 out_children=object_frame_clustered,
+                out_parents=DEFAULT_OUT_PARENTS_FRAME,
             ),
             key_response=cluster_key,
         )
@@ -333,6 +354,7 @@ def create_search_bot_layered_square_root(
                 enabled=True,
                 in_children=object_frame,
                 out_children=object_frame_clustered,
+                out_parents=DEFAULT_OUT_PARENTS_FRAME,
                 persistent=persistent,
                 min_cluster_size=min_cluster_size,
             ),
@@ -348,6 +370,7 @@ def create_search_bot_layered_square_root(
                 persistent=persistent,
                 in_children=object_frame,
                 out_children=object_frame_clustered,
+                out_parents=DEFAULT_OUT_PARENTS_FRAME,
             ),
             key_response=cluster_key,
         )
@@ -431,6 +454,7 @@ def create_search_bot_bb_root(
             enabled=True,
             in_children=frame,
             out_children=frame_clustered,
+            out_parents=DEFAULT_OUT_PARENTS_FRAME,
             persistent=False,
         ),
     )
@@ -445,6 +469,7 @@ def create_search_bot_bb_root(
             persistent=False,
             in_children=frame,
             out_children=frame_clustered,
+            out_parents=DEFAULT_OUT_PARENTS_FRAME,
         ),
     )
 
@@ -536,6 +561,7 @@ def create_search_front_root(
             enabled=True,
             in_children=object_frame,
             out_children=object_frame_clustered,
+            out_parents=DEFAULT_OUT_PARENTS_FRAME,
             persistent=False,
         ),
     )
@@ -549,6 +575,7 @@ def create_search_front_root(
             persistent=False,
             in_children=object_frame,
             out_children=object_frame_clustered,
+            out_parents=DEFAULT_OUT_PARENTS_FRAME,
         ),
     )
 

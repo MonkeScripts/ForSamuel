@@ -65,6 +65,11 @@
       <gravity>0</gravity>
       <velocity_decay />
 
+      <!-- DVL sensor disabled to recover RTF — re-enable by removing the
+           outer comment wrappers around this <sensor> block and the
+           <plugin filename="DVLBridge"> further down. Nothing currently
+           subscribes to /bluerov/dvl/velocity unless launched with
+           use_dvl:=true (see bluerov_mission.launch.py).
       <sensor
         name="nortek_dvl500_300" type="custom"
         gz:type="dvl">
@@ -124,11 +129,10 @@
           </tracking>
           <maximum_range>200.</maximum_range>
           <minimum_range>0.3</minimum_range>
-          <!-- <reference_frame>0 0 0 3.14 0 -1.57</reference_frame> -->
-
           <reference_frame>0 0 0 0 0 1.5708</reference_frame>
         </gz:dvl>
       </sensor>
+      -->
 
       <self_collide>0</self_collide>
       <enable_wind>0</enable_wind>
@@ -334,9 +338,12 @@
       <child>torpedo_shooter_right_link</child>
     </joint>
 
+    <!-- DVL bridge disabled together with the DVL sensor above.
     <plugin filename="DVLBridge" name="dave_ros_gz_plugins::DVLBridge">
       <topic>/bluerov/dvl/velocity</topic>
     </plugin>
+    -->
+
 
     <!-- Hydrodynamics plugin -->
     <plugin

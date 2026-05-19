@@ -38,13 +38,14 @@
 # Image matching nodes
 /**/image_brighten_node:
   ros__parameters:
-    brightness_factor: 1.5
+    brightness_factor: 0.7
     input_image_topic: /bluerov/bottom_cam/image
     output_image_topic: /bluerov/bottom_cam/brighten/image
 
 /**/simple_matcher_node:
   ros__parameters:
-    input_image_topic: /bluerov/bottom_cam/brighten/image
+    # input_image_topic: /bluerov/bottom_cam/brighten/image
+    input_image_topic: /bluerov/bottom_cam/image
     output_annotations_topic: image_matching/annotations
 
 /**/points_pose_estimator_node:

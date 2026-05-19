@@ -1,7 +1,10 @@
 import operator
+import os
+import sys
 
 import py_trees
 import py_trees_ros
+from ament_index_python.packages import get_package_prefix
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
@@ -15,12 +18,10 @@ from mission_planner_2.common.util.detection_utils import (
     create_img_matching_request,
     create_start_vision_req,
 )
-from mission_planner_2.common.util.namespace_utils import (
-    full_key_generator,
-    generate_namespace,
-)
+from mission_planner_2.common.util.namespace_utils import full_key_generator
 from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
+    create_stamped_pose,
     tf_to_stamped_pose,
     within_threshold_xyz,
 )
@@ -29,7 +30,6 @@ from mission_planner_2.vehicles.auv.trees.robosub24.bins.helpers import find_acu
 from mission_planner_2.vehicles.auv.trees.robosub24.bins.template_selector import (
     create_template_selector_root,
 )
-from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
 from mission_planner_2.vehicles.shared.trees.cluster_goto import (
     create_goto_cluster_from_bb_root,
@@ -41,7 +41,23 @@ from mission_planner_2.vehicles.shared.trees.tf_checker import (
     create_tf_checker_from_constant_root,
 )
 
-NAMESPACE = generate_namespace()
+# Pull the BlueROV-routed goto wrappers from scripts/goto.py — they live in
+# the installed `lib/bluerov_sim/` directory (ament_cmake `install(PROGRAMS …)`),
+# not in this package, so import via the ament-resolved prefix.
+_BLUEROV_SCRIPTS_DIR = os.path.join(
+    get_package_prefix("bluerov_sim"), "lib", "bluerov_sim"
+)
+if _BLUEROV_SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _BLUEROV_SCRIPTS_DIR)
+import goto  # noqa: E402  (bluerov_sim/scripts/goto.py)
+from arm_and_set_mode import ArmAndSetMode  # noqa: E402  (bluerov_sim/scripts/arm_and_set_mode.py)
+
+# Upstream uses generate_namespace(), which walks the caller path for
+# `/trees/` — bluerov_sim/bins/bins.py isn't under any `/trees/`, so we
+# hardcode the namespace that path WOULD have produced in mission_planner_2
+# (`/auv/robosub24/bins/bins`). Keeps blackboard keys collision-free without
+# moving the file or forking namespace_utils.
+NAMESPACE = "/bluerov/bins"
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
@@ -68,7 +84,8 @@ STABILIZE_CONTROLS_DURATION = 5.0
 RETRIES = 4
 NUM_RETRIES = 3
 
-BIN_DEPTH_OVERRIDE_VALUE = 1.3
+# Negative z = 1.3 m below surface in map/ENU (see SEARCH_DEPTH note).
+BIN_DEPTH_OVERRIDE_VALUE = -1.3
 
 BIN_CENTRE_VIEW_FRAME = "bin/centre/view"
 FISH_BIN_VIEW_FRAME = "bin/fish/view"
@@ -83,13 +100,28 @@ SEARCH_PATTERN = [
     {"x": -0.5, "y": 0.0, "z": 0.0},
 ]
 
+# Bin pose in the robosub_2025_pool world (bb_worlds/worlds/robosub_2025_pool.world:
+# `<include><uri>model://robosub25/bin</uri><pose>-6 4.5 -2 0 0 0</pose>`). Hardcoded
+# to give the BT a coarse approach point before its layered-square search refines
+# the position via YOLO detections.
+BIN_WORLD_X = -6.0
+BIN_WORLD_Y = 4.5
+
 SEARCH_FWD = 1.0
 SEARCH_BACK = 0.3
 SEARCH_LEFT = 0.5
 SEARCH_RIGHT = 0.5
-NUM_SQUARES = 3
+# NUM_SQUARES=1 triggers a special-case in shared_trees/search.py's
+# cluster_validate_seq: `operator=lambda x, y: x.cluster_spread < y or
+# num_squares == 1`. So with one layer, the cluster check auto-passes and
+# the BT advances after a single 4-waypoint sweep instead of trying
+# escalating squares. Bump this back up (3+) once detections are stable
+# enough that we want strict spread validation.
+NUM_SQUARES = 1
 OFFSET_COEFF = 1.0
-SEARCH_DEPTH = 0.3
+# Map/ENU convention: negative z = below surface (see scripts/bluerov_movement.py
+# self.depth = -2.0). Upstream AUV uses NED where positive = down — flipped here.
+SEARCH_DEPTH = -0.3
 BETWEEN_DROPS_WAIT = 3.5
 EXTRA_DROP_WAIT = 0.5
 WAIT_BETWEEN_MOVES = 1.0
@@ -142,6 +174,23 @@ def create_bin_root():
         num_failures=NUM_RETRIES,
     )
 
+    # Coarse approach: fly to the bin's known world (x, y) at search depth
+    # before the search square fires. Pose is in map frame, so anchor_frame
+    # stays at base_link (no offset subtraction needed) and depth_override
+    # forces SEARCH_DEPTH so we don't dive to the bin floor on approach.
+    # specified_heading=False — we don't care which way we're facing yet.
+    goto_bin_vicinity = goto.FromConstant(
+        name="Goto bin vicinity",
+        pose=create_stamped_pose(
+            frame_id="map",
+            position_x=BIN_WORLD_X,
+            position_y=BIN_WORLD_Y,
+        ),
+        anchor_frame_name=BASE_LINK_FRAME,
+        specified_heading=False,
+        depth_override_value=SEARCH_DEPTH,
+    )
+
     seq_search = create_search_bot_layered_square_root(
         fwd=SEARCH_FWD,
         back=SEARCH_BACK,
@@ -163,6 +212,7 @@ def create_bin_root():
         action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
+            out_parents="map",  # upstream default is "world_ned" (AUV) — we use map
             duration=7,
         ),
     )
@@ -521,6 +571,7 @@ def create_bin_root():
     seq_drop_into_bin.add_children(
         children=[
             retry_start_vision,
+            goto_bin_vicinity,
             seq_search,
             # cluster_bin_centre,  # TODO: remove this if use search
             extract_tf,
@@ -612,4 +663,19 @@ def create_bin_root():
         ]
     )
 
-    return sel_bin_failure_fallback
+    # Top-level sequence: arm + GUIDED first, then run the bin mission
+    # (with its own success/fallback selector). Mirrors the square BT root
+    # in scripts/bluerov_square_mission_tree.py so the bin mission no
+    # longer relies on the operator arming via QGroundControl first.
+    root = py_trees.composites.Sequence(
+        name="Bin mission root",
+        memory=True,
+    )
+    root.add_children(
+        [
+            ArmAndSetMode(name="arm_and_set_mode"),
+            sel_bin_failure_fallback,
+        ]
+    )
+
+    return root

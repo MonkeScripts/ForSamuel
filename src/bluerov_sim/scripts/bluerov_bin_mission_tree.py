@@ -5,9 +5,12 @@ Builds `create_bin_root()` from `bluerov_sim.bins.bins` (mirrored from
 mission_planner_2's AUV4 RoboSub-24 bin tree) and tick-tocks it with a
 BumbleTree.
 
-Prereqs: launch `bluerov_bin.launch.py` so the locomotion action server,
-convert_to_controls_pose service, cluster_tf action+service servers, static
-TFs, choice_server, vision pipeline, and the actuators stub are all up.
+Prereqs (each in its own tmux pane — see bluerov_bin_mission.yaml):
+  • bluerov_sim.launch.py          (Gazebo + ArduSub + MAVROS)
+  • bluerov_bin_controls.launch.py (locomotion + convert_to_controls_pose + TFs + actuators)
+  • bluerov_bin_cluster.launch.py  (cluster_tf action + service servers under /bluerov)
+  • bluerov_bin_vision.launch.py   (YOLO + image_matching + pose estimators)
+Then bluerov_bin_bt.launch.py runs this node.
 """
 
 import traceback
