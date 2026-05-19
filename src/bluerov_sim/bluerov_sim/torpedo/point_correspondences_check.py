@@ -11,12 +11,11 @@ from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackbo
 from mission_planner_2.common.util.detection_utils import (
     create_img_matching_request,
 )
-from mission_planner_2.common.util.namespace_utils import (
-    full_key_generator,
-    generate_namespace,
-)
+from mission_planner_2.common.util.namespace_utils import full_key_generator
 
-NAMESPACE = generate_namespace()
+# Hardcoded namespace — generate_namespace() walks the caller path for
+# `/trees/` but this file isn't under one. Same workaround as bins.py.
+NAMESPACE = "/bluerov/torpedo/correspondences"
 fk = full_key_generator(NAMESPACE)
 
 _POINTS_1_KEY = fk("points_1")

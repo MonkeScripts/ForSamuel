@@ -1,12 +1,11 @@
 # BlueROV2 torpedo-task vision pipeline parameters.
 #
 # Diff vs. auv4_orin/torpedo.yaml:
-# - Topics point at BlueROV's front camera (`/bluerov/front_cam/image`).
+# - Topics point at BlueROV's front camera (`/bluerov/front_cam/image` and
+#   `/bluerov/front_cam/camera_info`, both bridged from Gazebo Harmonic via
+#   ros_gz_bridge — see config/bluerov_gz_bridge.yaml).
 # - model_path uses the latest .pt available locally
-#   (`yolov11s_torpedo_20250817_0.pt`) since Stage 1 has no TRT. The AUV4
-#   config referenced a 2026 yolov26 model that is not in src/ml_models.
-# - camera_info_topic — same caveat as bin.yaml; BlueROV SDF cameras need
-#   either a Gazebo CameraInfo plugin or a static publisher.
+#   (`yolov11s_torpedo_20250817_0.pt`) since Stage 1 has no TRT.
 
 /**/torpedo_yolo_node:
   ros__parameters:
@@ -51,3 +50,12 @@
       - torpedo_yolo_node
       - torpedo_hole_yolo_node
     wait_timeout_sec: 1.0
+
+# Image matching — provides the toggle_template service and publishes
+# point_correspondences that the BT uses to confirm which of the two
+# torpedo panel templates (Task04_Tagging_01.png vs _02.png) the front
+# camera is looking at. Templates ship in image_matching/templates/robosub25/.
+/**/simple_matcher_node:
+  ros__parameters:
+    input_image_topic: /bluerov/front_cam/image
+    output_annotations_topic: image_matching/annotations

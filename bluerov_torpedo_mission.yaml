@@ -1,0 +1,108 @@
+# tmuxp session: full BlueROV2 sim + behaviour-tree torpedo mission.
+# Load with:  tmuxp load bluerov_torpedo_mission.yaml
+#
+# Opens one tmux window with five tiled panes. Each layer of the stack runs
+# in its own pane so logs are isolated and any single layer can be Ctrl-C'd
+# and restarted without bouncing the rest. Same shape as
+# bluerov_bin_mission.yaml.
+#
+# Pane → launch file map:
+#   sim       — bluerov_sim.launch.py            (Gazebo + ArduSub + MAVROS + ground-truth bridges)
+#   controls  — bluerov_torpedo_controls.launch.py  (TFs + locomotion + convert_to_controls_pose + actuators)
+#   cluster   — bluerov_torpedo_cluster.launch.py   (cluster_tf action + service servers, use_sim_time=True)
+#   vision    — bluerov_torpedo_vision.launch.py    (YOLO + pose estimators + simple_matcher_node)
+#   bt        — bluerov_torpedo_bt.launch.py        (bluerov_torpedo_mission_tree)
+#
+# The torpedo BT (bluerov_sim/torpedo/torpedo.py) runs ArmAndSetMode as its
+# first leg, so no manual arming via QGroundControl is required.
+
+session_name: bluerov_torpedo_mission
+start_directory: /root/HOST/bluerov_ws
+
+environment:
+  GZ_VERSION: harmonic
+
+windows:
+  - window_name: mission
+    layout: tiled
+    panes:
+
+      # ── sim ────────────────────────────────────────────────────────────────
+      # Brings up everything needed for the vehicle to exist and be reachable:
+      #   • Gazebo Harmonic with the RoboSub 2025 pool world (contains two
+      #     torpedo panels: torpedo_panel_v1 at (-3, 0, -2) and
+      #     torpedo_panel_v2 at (3, 0, -2) — see
+      #     bb_worlds/worlds/robosub_2025_pool.world)
+      #   • ArduSub SITL (same firmware that runs on the real BlueROV2)
+      #   • MAVROS — ROS 2 ↔ MAVLink bridge
+      #   • foxglove_bridge on ws://localhost:8765
+      #   • ground_truth_to_mavros — feeds Gazebo odom into /mavros/odometry/out
+      #     and broadcasts the map→base_link TF
+      #   • world_objects_to_markers — publishes world SDF objects as MarkerArray
+      - pane_name: sim
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - ros2 launch bluerov_sim bluerov_sim.launch.py
+            world_name:=robosub_2025_pool
+            ardusub:=true
+            mavros:=true
+            gui:=true
+
+      # ── controls ───────────────────────────────────────────────────────────
+      # Control-plane services the torpedo BT needs to move the vehicle and
+      # fire the launchers:
+      #   • bluerov_tfs.launch.py — static + grouped TFs for torpedo task frames
+      #     (torpedo/centre, torpedo_{1,2}/{fish,shark}/view, etc.)
+      #   • locomotion_action_server — /bluerov/controls Locomotion action server
+      #     (publishes 1 Hz setpoints to /mavros/setpoint_position/local)
+      #   • convert_to_controls_pose — handles anchor_frame_name=torpedo_shooter_*_link
+      #     by subtracting the URDF shooter offset before returning the goal
+      #   • actuators_stub — /bluerov/actuation/torpedo/{left,right} Trigger services
+      - pane_name: controls
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - ros2 launch bluerov_sim bluerov_torpedo_controls.launch.py
+
+      # ── cluster ────────────────────────────────────────────────────────────
+      # cluster_tf action + service servers under /bluerov, with
+      # use_sim_time=True so the server's start_time stays on Gazebo's clock
+      # (matching the TF stamps from torpedo_pose_estimator). Without that
+      # flag every TF is dropped as "old" and the BT stalls in search.
+      - pane_name: cluster
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - ros2 launch bluerov_sim bluerov_torpedo_cluster.launch.py
+
+      # ── vision ─────────────────────────────────────────────────────────────
+      # Perception stack under /bluerov/torpedo:
+      #   • torpedo_yolo_node (lifecycle) + torpedo_hole_yolo_node (tracker)
+      #   • torpedo_pose_estimator_node — broadcasts torpedo/yolo TF
+      #     (PoseEstimatorTransformPubNode so cluster_tf can pick it up)
+      #   • torpedo_hole_pose_estimator_node — per-quadrant hole TFs
+      #   • simple_matcher_node — toggle_template service +
+      #     point_correspondences publisher for template selection
+      # The BT auto-activates the YOLO lifecycle nodes via
+      # /bluerov/torpedo/manage_nodes once it starts.
+      - pane_name: vision
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - ros2 launch bluerov_sim bluerov_torpedo_vision.launch.py
+
+      # ── bt ─────────────────────────────────────────────────────────────────
+      # The torpedo mission tree itself. Walks the vehicle through
+      # ArmAndSetMode → goto torpedo vicinity (0, -2, -1.2 in map) →
+      # front-yaw search → cluster torpedo/yolo → goto torpedo centre →
+      # check point correspondences for both templates → select correct
+      # template → move-and-shoot first torpedo → return to centre →
+      # move-and-shoot second torpedo → stop vision. Fallback fires both
+      # torpedoes blindly if the perception/alignment path fails.
+      # Tick logs land here only.
+      - pane_name: bt
+        shell_command:
+          - source /opt/ros/humble/setup.bash
+          - source install/setup.bash
+          - ros2 launch bluerov_sim bluerov_torpedo_bt.launch.py

@@ -1,15 +1,16 @@
+import os
+import sys
+
 import numpy as np
 import py_trees
 import py_trees_ros
+from ament_index_python.packages import get_package_prefix
 from geometry_msgs.msg import TransformStamped
 from std_srvs.srv import Trigger
 from tf_transformations import euler_from_quaternion
 
 from mission_planner_2.common.core import shared_action_client
-from mission_planner_2.common.util.namespace_utils import (
-    full_key_generator,
-    generate_namespace,
-)
+from mission_planner_2.common.util.namespace_utils import full_key_generator
 from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
@@ -17,7 +18,6 @@ from mission_planner_2.common.util.pose_utils import (
     within_threshold_xyz,
 )
 from bluerov_sim.node_registry import BlueROVSharedAction
-from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
 from mission_planner_2.vehicles.shared.trees.cluster_goto import (
     create_goto_cluster_from_bb_root,
@@ -27,13 +27,30 @@ from mission_planner_2.vehicles.shared.trees.tf_checker import (
     create_tf_checker_from_constant_root,
 )
 
-NAMESPACE = generate_namespace()
+# Pull the BlueROV-routed goto wrappers from scripts/goto.py — they live in
+# the installed `lib/bluerov_sim/` directory (ament_cmake `install(PROGRAMS …)`),
+# not in this package, so import via the ament-resolved prefix. Same idiom as
+# bluerov_sim/bins/bins.py and bluerov_sim/shared_trees/search.py.
+_BLUEROV_SCRIPTS_DIR = os.path.join(
+    get_package_prefix("bluerov_sim"), "lib", "bluerov_sim"
+)
+if _BLUEROV_SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _BLUEROV_SCRIPTS_DIR)
+import goto  # noqa: E402  (bluerov_sim/scripts/goto.py)
+
+# Upstream uses generate_namespace() which walks the caller path for `/trees/`
+# — this file isn't under any `/trees/`, so hardcode the namespace the path
+# WOULD have produced in mission_planner_2. Same workaround as bins.py.
+NAMESPACE = "/bluerov/torpedo/move_and_shoot"
 fk = full_key_generator(NAMESPACE)
 
 _CLUSTERING_GOAL_KEY = fk("clustering_goal")
 _CLUSTERING_GOAL_CHECK_KEY = fk("clustering_goal_check")
 
 BASE_LINK_FRAME = "base_link"
+# Upstream defaults clustering's out_parents to "world_ned" (AUV4 NED world).
+# Our BlueROV stack uses map/ENU — see bluerov_sim/shared_trees/search.py.
+OUT_PARENTS_FRAME = "map"
 
 
 def create_firing_root(
@@ -157,6 +174,7 @@ def create_move_and_shoot_generator(
             func=lambda frame, clustered: create_clustering_goal(
                 in_children=frame,
                 out_children=clustered,
+                out_parents=OUT_PARENTS_FRAME,
                 duration=cluster_duration,
                 use_cache=False,
             ),
@@ -170,6 +188,7 @@ def create_move_and_shoot_generator(
             func=lambda frame, clustered: create_clustering_goal(
                 in_children=frame,
                 out_children=clustered,
+                out_parents=OUT_PARENTS_FRAME,
                 duration=realign_cluster_duration,
                 use_cache=False,
             ),
@@ -248,7 +267,7 @@ def create_move_and_shoot_generator(
         _base_link_to_torp_view_frame_key = fk("bl_to_torp_view_frame")
 
         get_odom = create_tf_checker_from_constant_root(
-            start_frames=["world_ned"],
+            start_frames=[OUT_PARENTS_FRAME],
             end_frames=[BASE_LINK_FRAME],
             update_keys=[_odom_tf_key],
             fallback_val=[None],
