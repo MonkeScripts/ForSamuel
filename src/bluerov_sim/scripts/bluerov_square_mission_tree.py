@@ -36,7 +36,7 @@ import py_trees.console as console
 import rclpy
 from arm_and_set_mode import ArmAndSetMode
 from goto import FromConstant as Goto
-from node_registry import BlueROVTreeNode
+from bluerov_sim.node_registry import BlueROVTreeNode
 from geometry_msgs.msg import PoseStamped
 from mission_planner_2.common.core.bumble_tree import BumbleTree
 from mission_planner_2.common.core.hooks import stop_on_success_or_failure

@@ -1,0 +1,54 @@
+# BlueROV2 bin-task vision pipeline parameters.
+#
+# Diff vs. auv4_orin/bin.yaml:
+# - input_image_topic / camera_info_topic point at BlueROV's bottom camera
+#   in the Gazebo Harmonic sim (`/bluerov/bottom_cam/image`).
+# - model_path uses the .pt checkpoint (PyTorch) since the Stage 1
+#   Dockerfile does not install TensorRT. Ultralytics will load .pt via
+#   CUDA-PyTorch on first call.
+# - All paths assume the workspace is mounted at /root/HOST/bluerov_ws
+#   inside the container (the default in run.bash).
+# - camera_info_topic: see launch file — the BlueROV SDF camera does not
+#   publish CameraInfo by default, so the launch starts a small static
+#   publisher node (or you must add a Gazebo plugin).
+
+# YOLO nodes
+/**/bin_yolo_node:
+  ros__parameters:
+    model_path: /root/HOST/bluerov_ws/src/ml_models/yolov11_segment/yolov11s_bin_20250813_1.pt
+    conf: 0.25
+    iou: 0.7
+    agnostic_nms: true
+    input_image_topic: /bluerov/bottom_cam/image
+    output_detections_topic: bin/yolo/detections
+    output_annotations_topic: bin/yolo/annotations
+
+/**/bin_pose_estimator_node:
+  ros__parameters:
+    camera_info_topic: /bluerov/bottom_cam/camera_info
+    object_frame_id: bin/yolo
+    input_detections_topic: bin/yolo/detections
+
+/**/lifecycle_manager_node:
+  ros__parameters:
+    node_names:
+      - bin_yolo_node
+    wait_timeout_sec: 1.0
+
+# Image matching nodes
+/**/image_brighten_node:
+  ros__parameters:
+    brightness_factor: 0.7
+    input_image_topic: /bluerov/bottom_cam/image
+    output_image_topic: /bluerov/bottom_cam/brighten/image
+
+/**/simple_matcher_node:
+  ros__parameters:
+    # input_image_topic: /bluerov/bottom_cam/brighten/image
+    input_image_topic: /bluerov/bottom_cam/image
+    output_annotations_topic: image_matching/annotations
+
+/**/points_pose_estimator_node:
+  ros__parameters:
+    camera_info_topic: /bluerov/bottom_cam/camera_info
+    input_points_topic: image_matching/point_correspondences

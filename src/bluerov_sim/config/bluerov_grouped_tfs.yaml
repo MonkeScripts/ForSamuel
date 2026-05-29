@@ -1,0 +1,67 @@
+# Grouped (viewing-frame) static TFs for BlueROV2 bin/torpedo missions.
+#
+# Each block adds child frames to multiple parents in one shot, e.g. a
+# top-view frame above every bin/{centre,fish,shark}. Offsets describe
+# how far from the target the vehicle hovers to observe it.
+#
+# WARNING — camera-FOV-dependent.
+# The z/yaw/roll/pitch offsets here were originally calibrated for the
+# AUV4 camera FOV. BlueROV2 cameras have horizontal_fov = 1.6384266136 rad
+# (~93.9°) at 1024x768 — verify these offsets keep the target framed
+# during your first end-to-end run; tweak if alignment fails.
+
+torpedo:
+  - name: torpedo_1_fish
+    suffix: fish
+    parents:
+      - "torpedo_1"
+      - "torpedo_1/yolo"
+    x: 0.408
+    y: 0.391
+  - name: torpedo_1_shark
+    suffix: shark
+    parents:
+      - "torpedo_1"
+      - "torpedo_1/yolo"
+    x: 0.268
+    y: 0.09
+  - name: torpedo_2_fish
+    suffix: fish
+    parents:
+      - "torpedo_2"
+      - "torpedo_2/yolo"
+    x: 0.429
+    y: 0.084
+  - name: torpedo_2_shark
+    suffix: shark
+    parents:
+      - "torpedo_2"
+      - "torpedo_2/yolo"
+    x: 0.319
+    y: 0.336
+  - name: centre_view
+    parents:
+      - "torpedo/centre"
+    z: -0.7
+    roll: -90.0
+    pitch: -90.0
+  - name: shoot_view
+    parents:
+      - "torpedo_1/fish"
+      - "torpedo_1/shark"
+      - "torpedo_2/fish"
+      - "torpedo_2/shark"
+    z: -0.45
+    roll: -90.0
+    pitch: -90.0
+
+bin:
+  - name: top_view
+    parents:
+      - "bin/centre"
+      - "bin/fish"
+      - "bin/shark"
+      - "bin/fish/rotated"
+      - "bin/shark/rotated"
+    z: -0.65
+    yaw: -90.0

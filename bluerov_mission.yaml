@@ -10,6 +10,13 @@ start_directory: /root/HOST/bluerov_ws
 environment:
   GZ_VERSION: harmonic
 
+# Session-scoped tmux options. tmuxp applies these before the panes are
+# created so history-limit takes effect for every pane. `mouse` is quoted
+# so YAML doesn't coerce "on" into a boolean before tmuxp sees it.
+options:
+  mouse: "on"
+  history-limit: 100000
+
 windows:
   - window_name: mission
     layout: tiled

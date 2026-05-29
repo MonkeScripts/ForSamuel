@@ -1,0 +1,69 @@
+# BlueROV2 torpedo-task vision pipeline parameters.
+#
+# Diff vs. auv4_orin/torpedo.yaml:
+# - Topics point at BlueROV's front camera (`/bluerov/front_cam/image` and
+#   `/bluerov/front_cam/camera_info`, both bridged from Gazebo Harmonic via
+#   ros_gz_bridge — see config/bluerov_gz_bridge.yaml).
+# - model_path uses the latest .pt available locally
+#   (`yolov11s_torpedo_20250817_0.pt`) since Stage 1 has no TRT.
+
+/**/torpedo_yolo_node:
+  ros__parameters:
+    model_path: /root/HOST/bluerov_ws/src/ml_models/yolov11_segment/yolov11s_torpedo_20250817_0.pt
+    conf: 0.25
+    iou: 0.7
+    agnostic_nms: true
+    input_image_topic: /bluerov/front_cam/image
+    output_detections_topic: torpedo/yolo/detections
+    output_annotations_topic: torpedo/yolo/annotations
+
+/**/torpedo_hole_yolo_node:
+  ros__parameters:
+    model_path: /root/HOST/bluerov_ws/src/ml_models/yolov11_segment/yolov11s_torpedo_20250817_0.pt
+    conf: 0.25
+    iou: 0.7
+    agnostic_nms: true
+    input_image_topic: /bluerov/front_cam/image
+    output_detections_topic: torpedo/hole/yolo/detections
+    output_annotations_topic: torpedo/hole/yolo/annotations
+    display_tracker_id: true
+    tracker_config: botsort.yaml
+
+/**/torpedo_pose_estimator_node:
+  ros__parameters:
+    camera_info_topic: /bluerov/front_cam/camera_info
+    object_frame_id: torpedo/yolo
+    input_detections_topic: torpedo/yolo/detections
+
+/**/torpedo_hole_pose_estimator_node:
+  ros__parameters:
+    camera_info_topic: /bluerov/front_cam/camera_info
+    input_detections_topic: torpedo/hole/yolo/detections
+    top_left_frame_id: torpedo/hole/top_left
+    top_right_frame_id: torpedo/hole/top_right
+    bottom_left_frame_id: torpedo/hole/bottom_left
+    bottom_right_frame_id: torpedo/hole/bottom_right
+
+/**/lifecycle_manager_node:
+  ros__parameters:
+    node_names:
+      - torpedo_yolo_node
+      - torpedo_hole_yolo_node
+    wait_timeout_sec: 1.0
+
+# Image matching — provides the toggle_template service and publishes
+# point_correspondences that the BT uses to confirm which of the two
+# torpedo panel templates (Task04_Tagging_01.png vs _02.png) the front
+# camera is looking at. Templates ship in image_matching/templates/robosub25/.
+/**/simple_matcher_node:
+  ros__parameters:
+    input_image_topic: /bluerov/front_cam/image
+    output_annotations_topic: image_matching/annotations
+
+# Consumes simple_matcher's point_correspondences and broadcasts the
+# Task04_Tagging_<NN>_optical TF (frame_id comes from msg.object_frame_id).
+# That TF is the in_children that the torpedo BT hands to cluster_tf.
+/**/torpedo_points_pose_estimator_node:
+  ros__parameters:
+    camera_info_topic: /bluerov/front_cam/camera_info
+    input_points_topic: image_matching/point_correspondences

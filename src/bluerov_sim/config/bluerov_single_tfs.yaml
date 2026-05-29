@@ -1,0 +1,48 @@
+# Static TFs for BlueROV2 bin / torpedo missions.
+#
+# Task-frame offsets describing the RoboSub-2025 bin and torpedo-panel
+# geometry. Same physical objects as AUV4 sees, so offsets are copied
+# verbatim from src/mission_planner_2/cfg/single_tfs.yaml.
+#
+# The actuator TFs (dropper, torpedo_shooter_*) are NOT listed here —
+# they're emitted by robot_state_publisher from bluerov2.urdf.
+
+torpedo:
+  - name: torpedo_centre
+    x: 0.3
+    y: 0.3
+    parent_frame_id: "torpedo/yolo/clustered"
+    child_frame_id: "torpedo/centre"
+  - name: torpedo_1_yolo
+    parent_frame_id: "torpedo/yolo/clustered"
+    child_frame_id: "torpedo_1/yolo"
+  - name: torpedo_2_yolo
+    parent_frame_id: "torpedo/yolo/clustered"
+    child_frame_id: "torpedo_2/yolo"
+
+bin:
+  - name: bin_center
+    x: 0.1524
+    y: 0.3048
+    parent_frame_id: "bin/yolo/clustered"
+    child_frame_id: "bin/centre"
+  - name: bin_fish
+    x: 0.1524
+    y: 0.4568
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/fish"
+  - name: bin_shark
+    x: 0.1524
+    y: 0.1524
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/shark"
+  - name: bin_fish_rotated
+    x: 0.1524
+    y: 0.1524
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/fish/rotated"
+  - name: bin_shark_rotated
+    x: 0.1524
+    y: 0.4568
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/shark/rotated"
