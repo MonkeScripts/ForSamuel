@@ -38,7 +38,7 @@ repositories:
   bb_worlds:
     type: git
     url: https://github.com/BumblebeeAS/bb_worlds.git
-    version: 94f8d42d8a13c34ffe5226f8cce01096df40c87b
+    version: c0af75400f83eba4038d52ac5bdb08872d8d54d8
     depth: 1
 
   frames:
