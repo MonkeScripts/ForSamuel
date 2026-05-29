@@ -20,13 +20,13 @@ repositories:
   dave:
     type: git
     url: https://github.com/IOES-Lab/dave.git
-    version: 2e236fa32e0bbf8daa40e51cd2edce7c629f66f5
+    version: cc98a539fff009db4b4e63314219cfdc676c12a1
     depth: 1
 
   bb_msgs:
     type: git
     url: https://github.com/BumblebeeAS/bb_msgs.git
-    version: 79e02c50e3c3ef8344d4f2b2fcf76d3999ed75f6
+    version: 8d62b38e451e07c2efaf94a2c415129af3bf207b
     depth: 1
 
   mission_planner_2:
@@ -44,7 +44,7 @@ repositories:
   frames:
     type: git
     url: https://github.com/BumblebeeAS/frames.git
-    version: 7e3cc44136bd7718c06a2d1374a193933d494123
+    version: 4d618ec2268c4405031bc34cef7ffd5c33b281ac
     depth: 1
 
   # ── Perception packages (RoboSub-25 bin + torpedo tasks) ──────────────────
@@ -72,7 +72,7 @@ repositories:
   filters:
     type: git
     url: https://github.com/BumblebeeAS/filters.git
-    version: 8bcfc79a3e64a15ab424cb0b9d626afd8b415c4b
+    version: 84d7fc06172f0c5fde3a0536836f42479d223073
     depth: 1
 
   pose_estimator:

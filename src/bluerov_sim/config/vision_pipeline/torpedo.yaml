@@ -59,3 +59,11 @@
   ros__parameters:
     input_image_topic: /bluerov/front_cam/image
     output_annotations_topic: image_matching/annotations
+
+# Consumes simple_matcher's point_correspondences and broadcasts the
+# Task04_Tagging_<NN>_optical TF (frame_id comes from msg.object_frame_id).
+# That TF is the in_children that the torpedo BT hands to cluster_tf.
+/**/torpedo_points_pose_estimator_node:
+  ros__parameters:
+    camera_info_topic: /bluerov/front_cam/camera_info
+    input_points_topic: image_matching/point_correspondences

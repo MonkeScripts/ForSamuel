@@ -13,6 +13,11 @@
     /bluerov/torpedo/image_matching/{toggle_template,point_correspondences}
     service + topic that the BT uses to confirm which torpedo template
     (Task04_Tagging_01.png vs _02.png) is in view
+  - torpedo_points_pose_estimator_node — consumes simple_matcher's
+    point_correspondences and broadcasts the Task04_Tagging_<NN>_optical
+    TF that the BT's clustering action uses as in_children. Without this
+    node the cluster_tf action server can't look up the source frame and
+    the BT stalls in the front-yaw search leg.
 
 No BT, no locomotion, no actuators — split out per pane so vision can be
 restarted independently of the BT and cluster panes.
@@ -90,6 +95,16 @@ def generate_launch_description() -> LaunchDescription:
             package="image_matching",
             executable="simple_matcher_node",
             name="simple_matcher_node",
+            parameters=[cfg],
+        ),
+        # Subscribes to image_matching/point_correspondences, runs PnP, and
+        # broadcasts a TF stamped with msg.object_frame_id (set by
+        # simple_matcher to "Task04_Tagging_<NN>_optical"). cluster_tf reads
+        # that TF to build the clustered torpedo_<NN> frame.
+        Node(
+            package="pose_estimator",
+            executable="points_pose_estimator_node",
+            name="torpedo_points_pose_estimator_node",
             parameters=[cfg],
         ),
     ])
