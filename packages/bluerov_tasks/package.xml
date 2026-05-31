@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>bluerov_tasks</name>
+  <version>1.0.0</version>
+  <description>BlueROV2 mission, behavior tree, control, task TF, and vision launch examples</description>
+  <maintainer email="maintainer@example.com">maintainer</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>ament_cmake_python</build_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2_ros</depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>mavros_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>tf_transformations</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>bb_controls_msgs</exec_depend>
+  <exec_depend>bb_planner_msgs</exec_depend>
+  <exec_depend>frames</exec_depend>
+  <exec_depend>py_trees</exec_depend>
+  <exec_depend>py_trees_ros</exec_depend>
+  <exec_depend>mission_planner_2</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>bb_filters</exec_depend>
+  <exec_depend>yolo_ros_trt</exec_depend>
+  <exec_depend>vision_pipeline</exec_depend>
+  <exec_depend>pose_estimator</exec_depend>
+  <exec_depend>image_processing</exec_depend>
+  <exec_depend>image_matching</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

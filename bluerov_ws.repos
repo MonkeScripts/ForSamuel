@@ -1,11 +1,3 @@
-# bluerov_ws.repos
-# Usage: vcs import --recursive src < bluerov_ws.repos
-#
-# `--recursive` is required because `image_matching` vendors the XFeat model
-# code as a git submodule (BumblebeeAS/accelerated_features). Without it,
-# `simple_matcher_node` dies on import with
-# `ModuleNotFoundError: feature_matcher.models.accelerated_features.modules`.
-
 repositories:
 
   # ── Core: ArduPilot Gazebo Plugin ──────────────────────────────────────────
@@ -60,9 +52,6 @@ repositories:
     version: b3108e8400f5bb8e7ff625e023ed444fbbbff2fa
     depth: 1
 
-  # NOTE: image_matching has a submodule (accelerated_features / XFeat).
-  # Use `vcs import --recursive`, or after a non-recursive import run:
-  #   cd src/image_matching && git submodule update --init --recursive
   image_matching:
     type: git
     url: https://github.com/BumblebeeAS/image_matching.git

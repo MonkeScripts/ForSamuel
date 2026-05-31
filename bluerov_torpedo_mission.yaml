@@ -13,7 +13,7 @@
 #   vision    — bluerov_torpedo_vision.launch.py    (YOLO + pose estimators + simple_matcher_node)
 #   bt        — bluerov_torpedo_bt.launch.py        (bluerov_torpedo_mission_tree)
 #
-# The torpedo BT (bluerov_sim/torpedo/torpedo.py) runs ArmAndSetMode as its
+# The torpedo BT (bluerov_tasks/torpedo/torpedo.py) runs ArmAndSetMode as its
 # first leg, so no manual arming via QGroundControl is required.
 
 session_name: bluerov_torpedo_mission
@@ -42,7 +42,6 @@ windows:
       #     bb_worlds/worlds/robosub_2025_pool.world)
       #   • ArduSub SITL (same firmware that runs on the real BlueROV2)
       #   • MAVROS — ROS 2 ↔ MAVLink bridge
-      #   • foxglove_bridge on ws://localhost:8765
       #   • ground_truth_to_mavros — feeds Gazebo odom into /mavros/odometry/out
       #     and broadcasts the map→base_link TF
       #   • world_objects_to_markers — publishes world SDF objects as MarkerArray
@@ -70,7 +69,7 @@ windows:
         shell_command:
           - source /opt/ros/humble/setup.bash
           - source install/setup.bash
-          - ros2 launch bluerov_sim bluerov_controls.launch.py
+          - ros2 launch bluerov_tasks bluerov_controls.launch.py
 
       # ── cluster ────────────────────────────────────────────────────────────
       # cluster_tf action + service servers under /bluerov, with
@@ -81,7 +80,7 @@ windows:
         shell_command:
           - source /opt/ros/humble/setup.bash
           - source install/setup.bash
-          - ros2 launch bluerov_sim bluerov_cluster.launch.py
+          - ros2 launch bluerov_tasks bluerov_cluster.launch.py
 
       # ── vision ─────────────────────────────────────────────────────────────
       # Perception stack under /bluerov/torpedo:
@@ -97,7 +96,7 @@ windows:
         shell_command:
           - source /opt/ros/humble/setup.bash
           - source install/setup.bash
-          - ros2 launch bluerov_sim bluerov_torpedo_vision.launch.py
+          - ros2 launch bluerov_tasks bluerov_torpedo_vision.launch.py
 
       # ── bt ─────────────────────────────────────────────────────────────────
       # The torpedo mission tree itself. Walks the vehicle through
@@ -112,4 +111,4 @@ windows:
         shell_command:
           - source /opt/ros/humble/setup.bash
           - source install/setup.bash
-          - ros2 launch bluerov_sim bluerov_torpedo_bt.launch.py
+          - ros2 launch bluerov_tasks bluerov_torpedo_bt.launch.py
